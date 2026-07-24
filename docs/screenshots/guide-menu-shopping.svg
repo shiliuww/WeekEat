@@ -30,7 +30,7 @@
   <text x="140" y="536" fill="#6A5444" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">• 想吃的菜优先纳入本周菜单</text>
   <text x="140" y="564" fill="#6A5444" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">• 其余位置由营养度、喜好度、间隔度共同决定</text>
 
-  <rect x="760" y="240" width="430" height="340" rx="24" fill="#FFF8EF" stroke="#3D2B1F" stroke-width="3"/>
+  <rect x="760" y="228" width="430" height="326" rx="24" fill="#FFF8EF" stroke="#3D2B1F" stroke-width="3"/>
   <text x="792" y="286" fill="#3D2B1F" font-size="30" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">采购清单</text>
 
   <rect x="792" y="320" width="366" height="56" rx="16" fill="white" stroke="#E3D8CC" stroke-width="2"/>
@@ -47,10 +47,10 @@
 
   <path d="M702 410C734 410 734 410 760 410" stroke="#EF6C43" stroke-width="6" stroke-linecap="round"/>
   <path d="M748 396L770 410L748 424" stroke="#EF6C43" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="816" y="620" fill="#8C6B54" font-size="19" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">菜单确定后，食材会自动去重、汇总、分类。</text>
+  <text x="792" y="582" fill="#8C6B54" font-size="19" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">菜单确定后，食材会自动去重、汇总、分类。</text>
 
-  <rect x="760" y="612" width="430" height="68" rx="22" fill="url(#paint0_linear)" stroke="#3D2B1F" stroke-width="3"/>
-  <text x="874" y="654" fill="white" font-size="28" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">查看采购清单</text>
+  <rect x="792" y="608" width="366" height="64" rx="22" fill="url(#paint0_linear)" stroke="#3D2B1F" stroke-width="3"/>
+  <text x="889" y="647" fill="white" font-size="28" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">查看采购清单</text>
 
   <defs>
     <linearGradient id="paint0_linear" x1="975" y1="612" x2="975" y2="680" gradientUnits="userSpaceOnUse">

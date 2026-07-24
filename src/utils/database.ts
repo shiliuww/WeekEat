@@ -6,7 +6,10 @@ const DB_KEYS = {
   DISHES: 'recipe_dishes',
   PREFERENCES: 'recipe_preferences',
   GENERATION_HISTORY: 'recipe_generation_history',
+  PRESET_VERSION: 'recipe_preset_version',
 };
+
+const PRESET_LIBRARY_VERSION = 'weekeat-preset-20260724';
 
 const DEFAULT_PREFERENCES: UserPreference = {
   dislikedIngredients: [],
@@ -117,8 +120,28 @@ function mergePresetDish(presetDish: Dish, existingDish?: Dish): Dish {
   };
 }
 
+function mergePresetDishWithReset(presetDish: Dish, existingDish?: Dish): Dish {
+  if (!existingDish) {
+    return presetDish;
+  }
+
+  return {
+    ...presetDish,
+    ...existingDish,
+    tags: presetDish.tags,
+    recommendationScore: presetDish.recommendationScore,
+    lastRecommendedDate: undefined,
+    id: existingDish.id || presetDish.id,
+    name: existingDish.name || presetDish.name,
+    addedFrom: 'preset',
+    addedDate: existingDish.addedDate || presetDish.addedDate,
+  };
+}
+
 // 数据库初始化
 export const initDatabase = (): void => {
+  const shouldRefreshPresetState = appStorage.getItem(DB_KEYS.PRESET_VERSION) !== PRESET_LIBRARY_VERSION;
+
   // 初始化菜谱库
   if (!appStorage.getItem(DB_KEYS.DISHES)) {
     saveDishes(recipeDatabase);
@@ -136,7 +159,9 @@ export const initDatabase = (): void => {
         matchedExistingIds.add(existingDish.id);
       }
 
-      return mergePresetDish(presetDish, existingDish);
+      return shouldRefreshPresetState
+        ? mergePresetDishWithReset(presetDish, existingDish)
+        : mergePresetDish(presetDish, existingDish);
     });
 
     const remainingDishes = existingDishes.filter(dish => !matchedExistingIds.has(dish.id));
@@ -146,6 +171,11 @@ export const initDatabase = (): void => {
   // 初始化用户偏好
   if (!appStorage.getItem(DB_KEYS.PREFERENCES)) {
     savePreferences(DEFAULT_PREFERENCES);
+  }
+
+  if (shouldRefreshPresetState) {
+    appStorage.removeItem(DB_KEYS.GENERATION_HISTORY);
+    appStorage.setItem(DB_KEYS.PRESET_VERSION, PRESET_LIBRARY_VERSION);
   }
 };
 

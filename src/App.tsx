@@ -853,66 +853,81 @@ function ShoppingView({ shoppingList, selectedItems, onToggleItem, onBack }: {
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="min-h-screen lg:min-h-[calc(100vh-3rem)]"
+      className="min-h-screen bg-[linear-gradient(180deg,#fff8ef_0%,#fffdf8_100%)] lg:min-h-[calc(100vh-3rem)]"
     >
-      <div className="sticky top-0 bg-white z-10 p-6 border-b border-gray-100">
+      <div className="sticky top-0 z-10 border-b border-[#eadccd] bg-[#fffdf8]/95 p-6 backdrop-blur">
         <div className="mx-auto max-w-6xl flex items-center mb-4">
           <button onClick={onBack} className="p-2 -ml-2">
             <ChevronLeft className="w-6 h-6 text-gray-600" />
           </button>
-          <h1 className="text-2xl font-bold text-gray-800 ml-2">采购清单</h1>
+          <h1 className="ml-2 text-2xl font-black text-[#3d2b1f]">采购清单</h1>
         </div>
-        <div className="mx-auto max-w-6xl text-sm text-gray-500">
-          已选 {selectedItems.size} / {shoppingList.length} 项
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 text-sm text-[#8c6b54]">
+          <span className="rounded-full border border-[#efcfaa] bg-[#fff1c9] px-3 py-1 font-semibold">
+            已选 {selectedItems.size} / {shoppingList.length} 项
+          </span>
+          <span>横屏下会按分类分栏展示，勾选时不会再挤压错位。</span>
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-6 p-6 pb-24 lg:grid-cols-2">
+      <div className="mx-auto grid max-w-6xl gap-6 p-6 pb-24 lg:grid-cols-2 xl:grid-cols-3">
         {Object.entries(grouped).map(([category, items]) => (
-          <div key={category}>
-            <h3 className="text-lg font-bold text-gray-700 mb-3">{category}</h3>
+          <section
+            key={category}
+            className="rounded-[28px] border-2 border-[#3d2b1f] bg-[#fff8ef] p-4 shadow-[6px_6px_0_0_rgba(243,192,122,0.2)]"
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-black text-[#3d2b1f]">{category}</h3>
+              <span className="rounded-full border border-[#edd7bf] bg-white px-3 py-1 text-xs font-semibold text-[#8c6b54]">
+                {items.length} 项
+              </span>
+            </div>
             <div className="space-y-2">
               {items.map((item, idx) => (
                 <button
                   key={idx}
                   onClick={() => onToggleItem(item.name)}
                   className={cn(
-                    "w-full flex items-center justify-between p-4 rounded-2xl transition-all",
+                    "w-full rounded-2xl border p-4 text-left transition-all",
                     selectedItems.has(item.name)
-                      ? "bg-gray-100"
-                      : "bg-white border border-gray-100 hover:border-primary-200"
+                      ? "border-[#d9cec1] bg-[#f5efe8]"
+                      : "border-[#efe5da] bg-white hover:border-[#f2b48d]"
                   )}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-6 h-6 rounded-full border-2 flex items-center justify-center",
-                      selectedItems.has(item.name)
-                        ? "bg-primary-500 border-primary-500"
-                        : "border-gray-300"
-                    )}>
-                      {selectedItems.has(item.name) && (
-                        <Check className="w-4 h-4 text-white" />
-                      )}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <div className={cn(
+                        "mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-2",
+                        selectedItems.has(item.name)
+                          ? "bg-primary-500 border-primary-500"
+                          : "border-gray-300"
+                      )}>
+                        {selectedItems.has(item.name) && (
+                          <Check className="w-4 h-4 text-white" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className={cn(
+                          "font-medium text-[#3d2b1f]",
+                          selectedItems.has(item.name) && "line-through text-gray-400"
+                        )}>
+                          {item.name}
+                        </div>
+                        {item.isSameDay && (
+                          <span className="mt-2 inline-flex rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-600">
+                            当天买
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className={cn(
-                      "font-medium",
-                      selectedItems.has(item.name) && "line-through text-gray-400"
-                    )}>
-                      {item.name}
+                    <span className="shrink-0 rounded-full bg-[#fff6eb] px-3 py-1 text-sm font-semibold text-[#8c6b54] whitespace-nowrap">
+                      {item.quantity} {item.unit}
                     </span>
-                    {item.isSameDay && (
-                      <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full">
-                        当天买
-                      </span>
-                    )}
                   </div>
-                  <span className="text-gray-500 font-medium">
-                    {item.quantity} {item.unit}
-                  </span>
                 </button>
               ))}
             </div>
-          </div>
+          </section>
         ))}
       </div>
     </motion.div>
