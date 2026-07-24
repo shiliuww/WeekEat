@@ -172,6 +172,10 @@ export class AIService {
       throw new Error('请先在设置中配置API密钥');
     }
 
+    // #region debug-point C:api-request-shape
+    fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"wanted-cover-regression",runId:"pre-fix",hypothesisId:"C",location:"src/utils/aiService.ts:callAPI:request",msg:"[DEBUG] AI request prepared",data:{provider:this.config.provider,baseUrl:this.config.baseUrl,model:this.config.model,hasImage:!!image,messagePreview:messages?.map?.((message:any)=>typeof message?.content==='string'?message.content.slice(0,220):'[structured]').slice(0,2)},ts:Date.now()})}).catch(()=>{});
+    // #endregion
+
     const headers: any = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${this.config.apiKey}`,
@@ -218,6 +222,10 @@ export class AIService {
 
       const data = await response.json();
       const content = data.choices[0]?.message?.content;
+
+      // #region debug-point C:api-response-shape
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"wanted-cover-regression",runId:"pre-fix",hypothesisId:"C",location:"src/utils/aiService.ts:callAPI:response",msg:"[DEBUG] AI response received",data:{model:this.config.model,responsePreview:typeof content==='string'?content.slice(0,260):'',status:'ok'},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       
       if (!content) {
         throw new Error('API返回空响应');
@@ -226,6 +234,9 @@ export class AIService {
       console.log('✅ AI返回内容:', content);
       return content;
     } catch (error) {
+      // #region debug-point C:api-error
+      fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"wanted-cover-regression",runId:"pre-fix",hypothesisId:"C",location:"src/utils/aiService.ts:callAPI:error",msg:"[DEBUG] AI request failed",data:{model:this.config.model,error:String(error)},ts:Date.now()})}).catch(()=>{});
+      // #endregion
       console.error('❌ API请求异常:', error);
       throw error;
     }

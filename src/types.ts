@@ -64,6 +64,16 @@ export interface ShoppingItem {
   checked?: boolean;
 }
 
+export interface GenerationRecord {
+  id: string;
+  createdAt: string;
+  weeklyMenu: DailyMenu[];
+  shoppingList: ShoppingItem[];
+  desiredIngredients: string[];
+  desiredDishes: string[];
+  userDishNames: string[];
+}
+
 export interface UserPreference {
   dislikedIngredients: string[];
   dietaryRestrictions: string[];

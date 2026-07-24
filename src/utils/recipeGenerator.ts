@@ -100,11 +100,141 @@ function isWantedDish(dish: Dish, wantedDishIds: Set<string>): boolean {
   return wantedDishIds.has(dish.id);
 }
 
+function matchesRequestedDishName(dish: Dish, requestedName: string): boolean {
+  return dish.name.includes(requestedName) || requestedName.includes(dish.name);
+}
+
+function matchesRequestedIngredient(dish: Dish, requestedIngredient: string): boolean {
+  return dish.ingredients.some(ingredient =>
+    ingredient.name.includes(requestedIngredient) || requestedIngredient.includes(ingredient.name)
+  );
+}
+
+function pickBestMatchedDish(dishes: Dish[]): Dish | null {
+  if (dishes.length === 0) {
+    return null;
+  }
+
+  return [...dishes].sort((a, b) => (b.recommendationScore ?? 0) - (a.recommendationScore ?? 0))[0];
+}
+
+async function ensureIngredientCoverageDishes(
+  dishes: Dish[],
+  desiredIngredients: string[],
+  wantedNames: Set<string>
+): Promise<Dish[]> {
+  const ingredientWantedDishes: Dish[] = [];
+
+  for (const ingredient of desiredIngredients) {
+    let candidate = pickBestMatchedDish(dishes.filter(dish => matchesRequestedIngredient(dish, ingredient)));
+
+    if (!candidate) {
+      try {
+        const generatedDish = await aiService.generateDishFromName(`${ingredient}家常菜`, false, [ingredient]);
+        candidate = upsertDish(generatedDish);
+        dishes.push(candidate);
+      } catch (error) {
+        console.warn('⚠️ 食材补菜失败，跳过:', ingredient, error);
+        continue;
+      }
+    }
+
+    if (!wantedNames.has(candidate.name)) {
+      ingredientWantedDishes.push(withRoundWantedTag(candidate));
+      wantedNames.add(candidate.name);
+    }
+  }
+
+  return ingredientWantedDishes;
+}
+
+function getCoverageReport(
+  menu: DailyMenu[],
+  desiredDishes: string[],
+  desiredIngredients: string[]
+): {
+  missingDishes: string[];
+  missingIngredients: string[];
+} {
+  const missingDishes = desiredDishes.filter(requestedDish =>
+    !menu.some(day =>
+      Object.values(day.meals).some(meal =>
+        meal?.dishes.some(dish => matchesRequestedDishName(dish, requestedDish))
+      )
+    )
+  );
+
+  const missingIngredients = desiredIngredients.filter(requestedIngredient =>
+    !menu.some(day =>
+      Object.values(day.meals).some(meal =>
+        meal?.dishes.some(dish => matchesRequestedIngredient(dish, requestedIngredient))
+      )
+    )
+  );
+
+  return {
+    missingDishes,
+    missingIngredients,
+  };
+}
+
+async function resolveCoverageGapDishes(
+  dishes: Dish[],
+  missingDishes: string[],
+  missingIngredients: string[],
+  wantedNames: Set<string>
+): Promise<Dish[]> {
+  const recoveredDishes: Dish[] = [];
+
+  for (const dishName of missingDishes) {
+    let candidate = pickBestMatchedDish(dishes.filter(dish => matchesRequestedDishName(dish, dishName)));
+
+    if (!candidate) {
+      try {
+        candidate = upsertDish(await aiService.generateDishFromName(dishName));
+        dishes.push(candidate);
+      } catch (error) {
+        console.warn('⚠️ 补齐缺失菜名失败，跳过:', dishName, error);
+        continue;
+      }
+    }
+
+    if (!wantedNames.has(candidate.name)) {
+      recoveredDishes.push(withRoundWantedTag(candidate));
+      wantedNames.add(candidate.name);
+    }
+  }
+
+  for (const ingredient of missingIngredients) {
+    let candidate = pickBestMatchedDish(dishes.filter(dish => matchesRequestedIngredient(dish, ingredient)));
+
+    if (!candidate) {
+      try {
+        candidate = upsertDish(await aiService.generateDishFromName(`${ingredient}家常菜`, false, [ingredient]));
+        dishes.push(candidate);
+      } catch (error) {
+        console.warn('⚠️ 补齐缺失食材失败，跳过:', ingredient, error);
+        continue;
+      }
+    }
+
+    if (!wantedNames.has(candidate.name)) {
+      recoveredDishes.push(withRoundWantedTag(candidate));
+      wantedNames.add(candidate.name);
+    }
+  }
+
+  return recoveredDishes;
+}
+
 export async function updateRecipeLibrary(
   userDishes: Dish[],
   desiredIngredients: string[],
   desiredDishes: string[]
 ): Promise<Dish[]> {
+  // #region debug-point A:input-shape
+  fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"wanted-cover-regression",runId:"pre-fix",hypothesisId:"A",location:"src/utils/recipeGenerator.ts:updateRecipeLibrary:start",msg:"[DEBUG] updateRecipeLibrary input received",data:{userDishNames:userDishes.map(d=>d.name),desiredIngredients,desiredDishes},ts:Date.now()})}).catch(()=>{});
+  // #endregion
   const newDishes: Dish[] = [...userDishes];
   const desiredDishIds = new Set<string>();
   
@@ -133,16 +263,30 @@ export async function updateRecipeLibrary(
   const inputDishIds = newDishes.map(d => d.id);
   const ingredientRelatedIds = getDishes()
     .filter(d =>
-      d.ingredients.some(ing =>
-        desiredIngredients.some(desired =>
-          ing.name.includes(desired) || desired.includes(ing.name)
-        )
-      )
+      desiredIngredients.some(desired => matchesRequestedIngredient(d, desired))
     )
     .map(d => d.id);
 
+  for (const desiredIngredient of desiredIngredients) {
+    if (ingredientRelatedIds.some(id => getDishes().some(dish => dish.id === id && matchesRequestedIngredient(dish, desiredIngredient)))) {
+      continue;
+    }
+
+    try {
+      const generatedDish = await aiService.generateDishFromName(`${desiredIngredient}家常菜`, false, [desiredIngredient]);
+      const persistedDish = upsertDish(generatedDish);
+      newDishes.push(persistedDish);
+    } catch (error) {
+      console.warn('⚠️ 食材未命中本地库且补菜失败，跳过:', desiredIngredient, error);
+    }
+  }
+
+  // #region debug-point A:ingredient-match
+  fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"wanted-cover-regression",runId:"pre-fix",hypothesisId:"A",location:"src/utils/recipeGenerator.ts:updateRecipeLibrary:ingredientRelatedIds",msg:"[DEBUG] ingredient matches resolved",data:{desiredIngredients,ingredientRelatedCount:ingredientRelatedIds.length,ingredientRelatedNames:getDishes().filter(d=>ingredientRelatedIds.includes(d.id)).slice(0,12).map(d=>d.name),desiredDishIdCount:desiredDishIds.size,inputDishIds},ts:Date.now()})}).catch(()=>{});
+  // #endregion
+
   boostRecommendationScore(Array.from(new Set([...desiredDishIds, ...inputDishIds])), 28);
-  boostRecommendationScore(Array.from(new Set(ingredientRelatedIds)), 12);
+  boostRecommendationScore(Array.from(new Set(ingredientRelatedIds)), 24);
   
   return newDishes;
 }
@@ -499,14 +643,13 @@ export async function generateWeeklyMenu(
   const wantedNames = new Set<string>();
   
   for (const desiredName of desiredDishes) {
-    const matches = dishes.filter(d => 
-      d.name.includes(desiredName) || desiredName.includes(d.name)
-    );
+    const matches = dishes.filter(d => matchesRequestedDishName(d, desiredName));
     if (matches.length > 0) {
-      console.log('✅ 找到用户指定的菜:', matches[0].name);
-      if (!wantedNames.has(matches[0].name)) {
-        userWantedDishes.push(withRoundWantedTag(matches[0]));
-        wantedNames.add(matches[0].name);
+      const matchedDish = pickBestMatchedDish(matches) || matches[0];
+      console.log('✅ 找到用户指定的菜:', matchedDish.name);
+      if (!wantedNames.has(matchedDish.name)) {
+        userWantedDishes.push(withRoundWantedTag(matchedDish));
+        wantedNames.add(matchedDish.name);
       }
     } else {
       console.log('❌ 未找到用户指定的菜，寻找相似菜:', desiredName);
@@ -519,7 +662,14 @@ export async function generateWeeklyMenu(
       wantedNames.add(userDish.name);
     }
   }
+
+  const ingredientWantedDishes = await ensureIngredientCoverageDishes(dishes, desiredIngredients, wantedNames);
+  userWantedDishes.push(...ingredientWantedDishes);
   
+  // #region debug-point B:wanted-pool
+  fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"wanted-cover-regression",runId:"pre-fix",hypothesisId:"B",location:"src/utils/recipeGenerator.ts:generateWeeklyMenu:wantedPool",msg:"[DEBUG] wanted pool prepared",data:{desiredIngredients,desiredDishes,userInputDishNames:userDishes.map(d=>d.name),wantedDishNames:userWantedDishes.map(d=>d.name),wantedDishCategories:userWantedDishes.map(d=>({name:d.name,category:d.category,id:d.id}))},ts:Date.now()})}).catch(()=>{});
+  // #endregion
+
   console.log('⭐ 本轮想吃标签菜:', userWantedDishes.map(d => d.name));
   
   const remainingWanted = [...userWantedDishes];
@@ -614,6 +764,20 @@ export async function generateWeeklyMenu(
       console.log('✅ 用户指定的菜已包含:', desiredName);
     }
   }
+
+  const ingredientCoverage = desiredIngredients.map(ingredient => ({
+    ingredient,
+    matchedDishNames: weeklyMenu.flatMap(day =>
+      Object.values(day.meals).flatMap(meal =>
+        meal?.dishes.filter(dish =>
+          dish.ingredients.some(ing => ing.name.includes(ingredient) || ingredient.includes(ing.name))
+        ).map(dish => dish.name) ?? []
+      )
+    ),
+  }));
+  // #region debug-point C:pre-opt-cover
+  fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"wanted-cover-regression",runId:"pre-fix",hypothesisId:"C",location:"src/utils/recipeGenerator.ts:generateWeeklyMenu:preOptimizeCoverage",msg:"[DEBUG] pre-optimization coverage computed",data:{weeklyMenuSummary:weeklyMenu.map(day=>({dayName:day.dayName,meals:Object.fromEntries(Object.entries(day.meals).map(([mealType,meal])=>[mealType,meal?.dishes.map(d=>d.name)??[]]))})),desiredDishCoverage:desiredDishes.map(name=>({name,covered:weeklyMenu.some(day=>Object.values(day.meals).some(meal=>meal?.dishes.some(dish=>dish.name.includes(name)||name.includes(dish.name))))})),ingredientCoverage},ts:Date.now()})}).catch(()=>{});
+  // #endregion
   
   const optimizedMenu = await applyAiOptimization(
     weeklyMenu,
@@ -622,8 +786,33 @@ export async function generateWeeklyMenu(
     desiredDishes,
     wantedDishIds
   );
-  const finalMenu = ensureRequiredDishesInMenu(optimizedMenu, userWantedDishes, wantedDishIds);
+  let finalMenu = ensureRequiredDishesInMenu(optimizedMenu, userWantedDishes, wantedDishIds);
+  let coverageReport = getCoverageReport(finalMenu, desiredDishes, desiredIngredients);
+
+  if (coverageReport.missingDishes.length > 0 || coverageReport.missingIngredients.length > 0) {
+    console.warn('⚠️ 首次生成后覆盖不足，开始补齐:', coverageReport);
+    const recoveryWantedDishes = await resolveCoverageGapDishes(
+      dishes,
+      coverageReport.missingDishes,
+      coverageReport.missingIngredients,
+      wantedNames
+    );
+
+    if (recoveryWantedDishes.length > 0) {
+      recoveryWantedDishes.forEach(dish => wantedDishIds.add(dish.id));
+      finalMenu = ensureRequiredDishesInMenu(
+        finalMenu,
+        [...userWantedDishes, ...recoveryWantedDishes],
+        wantedDishIds
+      );
+      coverageReport = getCoverageReport(finalMenu, desiredDishes, desiredIngredients);
+    }
+  }
   const finalSelectedDishIds = collectDishIdsFromMenu(finalMenu);
+
+  // #region debug-point D:final-cover
+  fetch("http://127.0.0.1:7777/event",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sessionId:"wanted-cover-regression",runId:"pre-fix",hypothesisId:"D",location:"src/utils/recipeGenerator.ts:generateWeeklyMenu:finalCoverage",msg:"[DEBUG] final menu coverage computed",data:{finalMenuSummary:finalMenu.map(day=>({dayName:day.dayName,meals:Object.fromEntries(Object.entries(day.meals).map(([mealType,meal])=>[mealType,meal?.dishes.map(d=>({name:d.name,isUserInput:!!d.isUserInput,tags:d.tags}))??[]]))})),desiredDishCoverage:desiredDishes.map(name=>({name,covered:finalMenu.some(day=>Object.values(day.meals).some(meal=>meal?.dishes.some(dish=>matchesRequestedDishName(dish, name))))})),ingredientCoverage:desiredIngredients.map(ingredient=>({ingredient,covered:finalMenu.some(day=>Object.values(day.meals).some(meal=>meal?.dishes.some(dish=>matchesRequestedIngredient(dish, ingredient))))})),coverageReport},ts:Date.now()})}).catch(()=>{});
+  // #endregion
 
   updateRecommendationScores(finalSelectedDishIds);
   

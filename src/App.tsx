@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-import { Plus, ShoppingCart, Calendar, ChevronLeft, Upload, Check, ChefHat, Trash2, Settings, MessageSquare, Sparkles, RefreshCw, Bot, EyeOff, BookOpen, ThumbsUp, Download, X } from 'lucide-react';
-import { Dish, DailyMenu, ShoppingItem } from './types';
+import { Plus, ShoppingCart, Calendar, ChevronLeft, Upload, Check, ChefHat, Trash2, Settings, MessageSquare, Sparkles, RefreshCw, Bot, EyeOff, BookOpen, ThumbsUp, Download, X, Heart, History } from 'lucide-react';
+import { Dish, DailyMenu, ShoppingItem, GenerationRecord } from './types';
 import { generateWeeklyMenu, generateShoppingList, analyzeImage } from './utils/recipeGenerator';
 import { initDatabase, getDishes, boostRecommendationScore, upsertDish, applyDietPreferenceProfile } from './utils/database';
 import { aiService } from './utils/aiService';
@@ -11,15 +11,18 @@ import { twMerge } from 'tailwind-merge';
 import { loadConfig, saveConfig, validateConfig, AppConfig, PROVIDERS, Provider, supportsVision } from './utils/config';
 import { loadJson, saveJson } from './utils/storage';
 import { toPng } from 'html-to-image';
+import { checkForAppUpdate, dismissUpdateReminder, openUpdateLink } from './utils/updateChecker';
+import type { AvailableUpdate } from './utils/updateChecker';
 
 function cn(...inputs: any[]) {
   return twMerge(clsx(inputs));
 }
 
-type ViewState = 'home' | 'upload' | 'menu' | 'shopping' | 'settings' | 'chat' | 'library';
+type ViewState = 'home' | 'upload' | 'menu' | 'shopping' | 'settings' | 'chat' | 'library' | 'history';
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
 const APP_STATE_KEY = 'recipe_app_state_v1';
+const GENERATION_HISTORY_KEY = 'weekeat_generation_history_v1';
 
 type PersistedAppState = {
   view: ViewState;
@@ -54,6 +57,70 @@ function loadAppState(): PersistedAppState {
   };
 }
 
+function loadGenerationHistory(): GenerationRecord[] {
+  return loadJson<GenerationRecord[]>(GENERATION_HISTORY_KEY, []);
+}
+
+function saveGenerationHistory(records: GenerationRecord[]): void {
+  saveJson(GENERATION_HISTORY_KEY, records);
+}
+
+async function saveElementAsImage(
+  element: HTMLElement,
+  fileName: string,
+  shareTitle: string,
+  shareText: string
+): Promise<void> {
+  const dataUrl = await toPng(element, {
+    cacheBust: true,
+    pixelRatio: 2,
+    backgroundColor: '#fff7eb',
+  });
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  const imageFile = new File([blob], fileName, { type: 'image/png' });
+  const shareNavigator = navigator as Navigator & {
+    canShare?: (data: ShareData) => boolean;
+  };
+
+  if (navigator.share && shareNavigator.canShare?.({ files: [imageFile] })) {
+    await navigator.share({
+      files: [imageFile],
+      title: shareTitle,
+      text: shareText,
+    });
+    return;
+  }
+
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = fileName;
+  link.click();
+}
+
+function buildGenerationRecord(
+  weeklyMenu: DailyMenu[],
+  shoppingList: ShoppingItem[],
+  desiredIngredients: string[],
+  desiredDishes: string[],
+  userDishes: Dish[]
+): GenerationRecord {
+  return {
+    id: `record-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    weeklyMenu,
+    shoppingList,
+    desiredIngredients: [...desiredIngredients],
+    desiredDishes: [...desiredDishes],
+    userDishNames: userDishes.map((dish) => dish.name),
+  };
+}
+
+function formatRecordTime(isoString: string): string {
+  const date = new Date(isoString);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 function App() {
   const initialStateRef = useRef<PersistedAppState>(loadAppState());
   const initialState = initialStateRef.current;
@@ -71,9 +138,12 @@ function App() {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set(initialState.selectedItems));
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(initialState.chatMessages);
   const [config, setConfig] = useState<AppConfig>(loadConfig);
+  const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(null);
+  const [generationHistory, setGenerationHistory] = useState<GenerationRecord[]>(loadGenerationHistory);
 
   useEffect(() => {
     initDatabase();
+    void checkForAppUpdate().then(setAvailableUpdate);
   }, []);
 
   useEffect(() => {
@@ -105,6 +175,10 @@ function App() {
     selectedItems,
     chatMessages,
   ]);
+
+  useEffect(() => {
+    saveGenerationHistory(generationHistory);
+  }, [generationHistory]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -155,6 +229,10 @@ function App() {
       setWeeklyMenu(menu);
       const shopping = await generateShoppingList(menu);
       setShoppingList(shopping);
+      setGenerationHistory((prev) => [
+        buildGenerationRecord(menu, shopping, desiredIngredients, desiredDishes, userDishes),
+        ...prev,
+      ]);
       setView('menu');
     } catch (error) {
       console.error('生成失败:', error);
@@ -185,6 +263,7 @@ function App() {
               onSettings={() => setView('settings')}
               onChat={() => setView('chat')}
               onLibrary={() => setView('library')}
+              onHistory={() => setView('history')}
               hasConfig={validateConfig(config)}
               config={config}
             />
@@ -264,7 +343,110 @@ function App() {
               onBack={() => setView('home')}
             />
           )}
+
+          {view === 'history' && (
+            <HistoryView
+              key="history"
+              records={generationHistory}
+              onBack={() => setView('home')}
+              onDeleteRecord={(recordId) =>
+                setGenerationHistory((prev) => prev.filter((record) => record.id !== recordId))
+              }
+            />
+          )}
         </AnimatePresence>
+
+        {availableUpdate && (
+          <UpdatePrompt
+            update={availableUpdate}
+            onDismiss={() => {
+              dismissUpdateReminder(availableUpdate.version);
+              setAvailableUpdate(null);
+            }}
+            onUpdateNow={() => {
+              openUpdateLink(availableUpdate.releaseUrl);
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UpdatePrompt({
+  update,
+  onDismiss,
+  onUpdateNow,
+}: {
+  update: AvailableUpdate;
+  onDismiss: () => void;
+  onUpdateNow: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-5 sm:px-6">
+      <div className="w-[min(30rem,calc(100vw-2rem))] rounded-[28px] border-2 border-[#3d2b1f] bg-[#fffaf2] p-5 shadow-[8px_8px_0_0_rgba(243,192,122,0.35)] sm:w-[min(34rem,calc(100vw-3rem))]">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d46a4c]">发现新版本</div>
+            <h3 className="mt-1 text-xl font-black text-[#3d2b1f]">
+              {update.title || `WeekEat ${update.version}`}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-[#6f5646]">
+              当前版本 <span className="font-semibold text-[#3d2b1f]">v{update.currentVersion}</span>，最新版本 <span className="font-semibold text-[#3d2b1f]">v{update.version}</span>。
+              {update.publishedAt ? ` 发布日期：${update.publishedAt}。` : ''}
+            </p>
+          </div>
+          {!update.forceUpdate && (
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="rounded-full border-2 border-[#3d2b1f] bg-white p-2 text-[#6a5444]"
+              aria-label="关闭更新提醒"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-[#eddac6] bg-white px-4 py-4">
+          <div className="text-sm font-semibold text-[#8c5a2b]">更新内容</div>
+          {update.releaseNotes.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {update.releaseNotes.map((note, index) => (
+                <div
+                  key={`${update.version}-note-${index}`}
+                  className="rounded-2xl border border-[#f5e4cf] bg-[#fffaf5] px-3 py-2 text-sm leading-6 text-[#5f4a3a]"
+                >
+                  {note}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm leading-6 text-[#7f6b5d]">
+              已发布新版本，建议前往下载最新版安装包。
+            </p>
+          )}
+        </div>
+
+        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          {!update.forceUpdate && (
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="inline-flex items-center justify-center rounded-full border-2 border-[#3d2b1f] bg-white px-4 py-2 text-sm font-semibold text-[#6a5444]"
+            >
+              稍后提醒我
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onUpdateNow}
+            className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-[#3d2b1f] bg-[#fff1c9] px-4 py-2 text-sm font-semibold text-[#8c5a2b] shadow-[3px_3px_0_0_rgba(243,192,122,0.3)]"
+          >
+            <Download className="h-4 w-4" />
+            去下载更新
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -289,11 +471,12 @@ function RecipeLibraryWrapper({ onBack }: { onBack: () => void }) {
   );
 }
 
-function HomeView({ onStart, onSettings, onChat, onLibrary, hasConfig, config }: { 
+function HomeView({ onStart, onSettings, onChat, onLibrary, onHistory, hasConfig, config }: {
   onStart: () => void; 
   onSettings: () => void; 
   onChat: () => void;
   onLibrary: () => void;
+  onHistory: () => void;
   hasConfig: boolean;
   config: AppConfig;
 }) {
@@ -304,6 +487,13 @@ function HomeView({ onStart, onSettings, onChat, onLibrary, hasConfig, config }:
       className="flex min-h-screen flex-col items-center justify-center p-6 bg-[radial-gradient(circle_at_top,#fff2cc_0%,#fffdf8_45%,#ffe9d4_100%)] lg:min-h-[calc(100vh-3rem)] lg:px-10"
     >
       <div className="absolute top-4 right-4 flex gap-2">
+        <button
+          onClick={onHistory}
+          className="p-3 bg-[#f7efe3] text-[#6a5444] rounded-full border-2 border-[#3d2b1f] transition-all"
+          title="历史记录"
+        >
+          <History className="w-6 h-6" />
+        </button>
         <button
           onClick={onLibrary}
           className="p-3 bg-[#fff1c9] text-[#8c5a2b] rounded-full border-2 border-[#3d2b1f] transition-all"
@@ -600,32 +790,12 @@ function MenuView({ weeklyMenu, onShopping, onBack, onRegenerate, isGenerating }
 
     setIsSavingImage(true);
     try {
-      const dataUrl = await toPng(captureRef.current, {
-        cacheBust: true,
-        pixelRatio: 2,
-        backgroundColor: '#fff7eb',
-      });
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
-      const fileName = `weekeat-menu-${new Date().toISOString().slice(0, 10)}.png`;
-      const imageFile = new File([blob], fileName, { type: 'image/png' });
-      const shareNavigator = navigator as Navigator & {
-        canShare?: (data: ShareData) => boolean;
-      };
-
-      if (navigator.share && shareNavigator.canShare?.({ files: [imageFile] })) {
-        await navigator.share({
-          files: [imageFile],
-          title: '本周菜谱',
-          text: 'WeekEat 本周菜谱',
-        });
-        return;
-      }
-
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = fileName;
-      link.click();
+      await saveElementAsImage(
+        captureRef.current,
+        `weekeat-menu-${new Date().toISOString().slice(0, 10)}.png`,
+        '本周菜谱',
+        'WeekEat 本周菜谱'
+      );
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         return;
@@ -798,7 +968,15 @@ function MealCard({
             <div key={`${dish.id}-${index}`} className="rounded-2xl border-2 border-[#3d2b1f] bg-white px-3 py-3 shadow-[3px_3px_0_0_rgba(243,192,122,0.28)]">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="font-bold text-[#3d2b1f]">{dish.name}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="font-bold text-[#3d2b1f]">{dish.name}</div>
+                    {dish.isUserInput && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-[#f2b48d] bg-[#fff1c9] px-2 py-1 text-[11px] font-semibold text-[#d46a4c]">
+                        <Heart size={12} className="fill-current" />
+                        想吃
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-[#7f6b5d] mt-1">
                     食材：{dish.ingredients.slice(0, 5).map((ing: any) => ing.name).join('、')}
                   </div>
@@ -841,6 +1019,8 @@ function ShoppingView({ shoppingList, selectedItems, onToggleItem, onBack }: {
   onToggleItem: (name: string) => void, 
   onBack: () => void,
 }) {
+  const captureRef = useRef<HTMLDivElement>(null);
+  const [isSavingImage, setIsSavingImage] = useState(false);
   const grouped = shoppingList.reduce((acc, item) => {
     if (!acc[item.category]) {
       acc[item.category] = [];
@@ -848,6 +1028,28 @@ function ShoppingView({ shoppingList, selectedItems, onToggleItem, onBack }: {
     acc[item.category].push(item);
     return acc;
   }, {} as Record<string, ShoppingItem[]>);
+
+  const handleSaveImage = async () => {
+    if (!captureRef.current || shoppingList.length === 0) return;
+
+    setIsSavingImage(true);
+    try {
+      await saveElementAsImage(
+        captureRef.current,
+        `weekeat-shopping-list-${new Date().toISOString().slice(0, 10)}.png`,
+        '采购清单',
+        'WeekEat 采购清单'
+      );
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
+      console.error('保存采购清单图片失败:', error);
+      alert('保存图片失败，请稍后再试');
+    } finally {
+      setIsSavingImage(false);
+    }
+  };
 
   return (
     <motion.div
@@ -867,10 +1069,29 @@ function ShoppingView({ shoppingList, selectedItems, onToggleItem, onBack }: {
             已选 {selectedItems.size} / {shoppingList.length} 项
           </span>
           <span>横屏下会按分类分栏展示，勾选时不会再挤压错位。</span>
+          <button
+            onClick={handleSaveImage}
+            disabled={isSavingImage}
+            className="inline-flex items-center gap-2 rounded-full border-2 border-[#3d2b1f] bg-[#fff1c9] px-4 py-2 text-sm font-semibold text-[#8c5a2b] shadow-[3px_3px_0_0_rgba(243,192,122,0.3)] disabled:opacity-50"
+          >
+            {isSavingImage ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            保存图片
+          </button>
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-6 p-6 pb-24 lg:grid-cols-2 xl:grid-cols-3">
+      <div ref={captureRef} className="mx-auto max-w-6xl px-6 pb-24">
+        <div className="mb-4 rounded-[28px] border-2 border-[#3d2b1f] bg-[#fff8ef] p-5 shadow-[6px_6px_0_0_rgba(243,192,122,0.28)]">
+          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#d46a4c]">WeekEat</div>
+          <div className="mt-2 text-3xl font-black text-[#3d2b1f]">采购清单</div>
+          <div className="mt-1 text-sm text-[#7f6b5d]">根据本周菜谱汇总出的采购清单，可直接保存为图片。</div>
+        </div>
+
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
         {Object.entries(grouped).map(([category, items]) => (
           <section
             key={category}
@@ -930,6 +1151,286 @@ function ShoppingView({ shoppingList, selectedItems, onToggleItem, onBack }: {
           </section>
         ))}
       </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function HistoryView({
+  records,
+  onBack,
+  onDeleteRecord,
+}: {
+  records: GenerationRecord[];
+  onBack: () => void;
+  onDeleteRecord: (recordId: string) => void;
+}) {
+  const [selectedRecord, setSelectedRecord] = useState<GenerationRecord | null>(null);
+  const [detailMode, setDetailMode] = useState<'menu' | 'shopping' | null>(null);
+  const [selectedTutorialDish, setSelectedTutorialDish] = useState<Dish | null>(null);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="min-h-screen bg-[linear-gradient(180deg,#fff8ef_0%,#fffdf8_100%)] p-6 lg:min-h-[calc(100vh-3rem)]"
+    >
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-8 flex items-center">
+          <button onClick={onBack} className="p-2 -ml-2">
+            <ChevronLeft className="w-6 h-6 text-gray-600" />
+          </button>
+          <h1 className="ml-2 text-2xl font-black text-[#3d2b1f]">历史记录</h1>
+        </div>
+
+        {records.length === 0 ? (
+          <div className="rounded-[28px] border-2 border-dashed border-[#d8c1a7] bg-[#fff8ef] p-8 text-center text-[#8c6b54]">
+            还没有生成记录。等你生成过一轮菜谱后，这里就会自动保存菜谱和采购清单。
+          </div>
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {records.map((record) => (
+              <article
+                key={record.id}
+                className="rounded-[28px] border-2 border-[#3d2b1f] bg-[#fff8ef] p-5 shadow-[6px_6px_0_0_rgba(243,192,122,0.2)]"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d46a4c]">
+                      {formatRecordTime(record.createdAt)}
+                    </div>
+                    <h3 className="mt-2 text-xl font-black text-[#3d2b1f]">
+                      第 {records.length - records.findIndex((item) => item.id === record.id)} 次生成
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteRecord(record.id)}
+                    className="rounded-full border-2 border-[#3d2b1f] bg-white p-2 text-[#6a5444]"
+                    aria-label="删除历史记录"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full border border-[#efcfaa] bg-[#fff1c9] px-3 py-1 font-semibold text-[#8c5a2b]">
+                    {record.weeklyMenu.length} 天菜谱
+                  </span>
+                  <span className="rounded-full border border-[#efcfaa] bg-white px-3 py-1 font-semibold text-[#8c5a2b]">
+                    {record.shoppingList.length} 项采购
+                  </span>
+                </div>
+
+                {(record.desiredIngredients.length > 0 || record.desiredDishes.length > 0 || record.userDishNames.length > 0) && (
+                  <div className="mt-4 space-y-2 text-sm text-[#6f5646]">
+                    {record.desiredIngredients.length > 0 && (
+                      <div>食材：{record.desiredIngredients.join('、')}</div>
+                    )}
+                    {record.desiredDishes.length > 0 && (
+                      <div>想吃的菜：{record.desiredDishes.join('、')}</div>
+                    )}
+                    {record.userDishNames.length > 0 && (
+                      <div>上传识别：{record.userDishNames.join('、')}</div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRecord(record);
+                      setDetailMode('menu');
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full border-2 border-[#3d2b1f] bg-[#fff1c9] px-4 py-2 text-sm font-semibold text-[#8c5a2b]"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    看菜谱
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRecord(record);
+                      setDetailMode('shopping');
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full border-2 border-[#3d2b1f] bg-white px-4 py-2 text-sm font-semibold text-[#6a5444]"
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    看清单
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selectedRecord && detailMode === 'menu' && (
+        <div
+          className="fixed inset-0 z-40 overflow-y-auto bg-black/35 px-4 py-5 sm:px-6"
+          onClick={() => setDetailMode(null)}
+        >
+          <div
+            className="mx-auto w-full max-w-6xl rounded-[32px] border-2 border-[#3d2b1f] bg-[#fffaf2] p-5 shadow-[8px_8px_0_0_rgba(243,192,122,0.35)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d46a4c]">历史菜谱</div>
+                <h3 className="mt-1 text-xl font-black text-[#3d2b1f]">{formatRecordTime(selectedRecord.createdAt)}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailMode(null)}
+                className="rounded-full border-2 border-[#3d2b1f] bg-white p-2 text-[#6a5444]"
+                aria-label="关闭历史菜谱"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {selectedRecord.weeklyMenu.map((day, idx) => (
+                <div key={`${selectedRecord.id}-${day.dayName}-${idx}`} className="card p-4 bg-[#fff8ef] border-2 border-[#3d2b1f] shadow-[6px_6px_0_0_rgba(243,192,122,0.35)]">
+                  <div className="inline-flex text-lg font-black text-[#d46a4c] mb-3 bg-[#ffe1d2] px-3 py-1 rounded-full border-2 border-[#3d2b1f]">
+                    {day.dayName}
+                  </div>
+                  {day.meals.breakfast && (
+                    <MealCard meal={day.meals.breakfast} label="早餐" onOpenTutorial={setSelectedTutorialDish} />
+                  )}
+                  {day.meals.lunch && (
+                    <MealCard meal={day.meals.lunch} label="午餐" onOpenTutorial={setSelectedTutorialDish} />
+                  )}
+                  {day.meals.dinner && (
+                    <MealCard meal={day.meals.dinner} label="晚餐" onOpenTutorial={setSelectedTutorialDish} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedRecord && detailMode === 'shopping' && (
+        <div
+          className="fixed inset-0 z-40 overflow-y-auto bg-black/35 px-4 py-5 sm:px-6"
+          onClick={() => setDetailMode(null)}
+        >
+          <div
+            className="mx-auto w-full max-w-5xl rounded-[32px] border-2 border-[#3d2b1f] bg-[#fffaf2] p-5 shadow-[8px_8px_0_0_rgba(243,192,122,0.35)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d46a4c]">历史采购清单</div>
+                <h3 className="mt-1 text-xl font-black text-[#3d2b1f]">{formatRecordTime(selectedRecord.createdAt)}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailMode(null)}
+                className="rounded-full border-2 border-[#3d2b1f] bg-white p-2 text-[#6a5444]"
+                aria-label="关闭历史采购清单"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              {Object.entries(
+                selectedRecord.shoppingList.reduce((acc, item) => {
+                  if (!acc[item.category]) {
+                    acc[item.category] = [];
+                  }
+                  acc[item.category].push(item);
+                  return acc;
+                }, {} as Record<string, ShoppingItem[]>)
+              ).map(([category, items]) => (
+                <section
+                  key={`${selectedRecord.id}-${category}`}
+                  className="rounded-[28px] border-2 border-[#3d2b1f] bg-[#fff8ef] p-4 shadow-[6px_6px_0_0_rgba(243,192,122,0.2)]"
+                >
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-black text-[#3d2b1f]">{category}</h3>
+                    <span className="rounded-full border border-[#edd7bf] bg-white px-3 py-1 text-xs font-semibold text-[#8c6b54]">
+                      {items.length} 项
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {items.map((item, idx) => (
+                      <div
+                        key={`${selectedRecord.id}-${category}-${item.name}-${idx}`}
+                        className="rounded-2xl border border-[#efe5da] bg-white p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="font-medium text-[#3d2b1f]">{item.name}</div>
+                            {item.isSameDay && (
+                              <span className="mt-2 inline-flex rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-600">
+                                当天买
+                              </span>
+                            )}
+                          </div>
+                          <span className="shrink-0 rounded-full bg-[#fff6eb] px-3 py-1 text-sm font-semibold text-[#8c6b54] whitespace-nowrap">
+                            {item.quantity} {item.unit}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedTutorialDish && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-5 sm:px-6"
+          onClick={() => setSelectedTutorialDish(null)}
+        >
+          <div
+            className="w-[min(28rem,calc(100vw-2rem))] rounded-[28px] border-2 border-[#3d2b1f] bg-[#fffaf2] p-5 shadow-[8px_8px_0_0_rgba(243,192,122,0.35)] sm:w-[min(30rem,calc(100vw-3rem))]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d46a4c]">文字教程</div>
+                <h3 className="mt-1 text-xl font-black text-[#3d2b1f]">{selectedTutorialDish.name}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTutorialDish(null)}
+                className="rounded-full border-2 border-[#3d2b1f] bg-white p-2 text-[#6a5444]"
+                aria-label="关闭教程窗口"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+              {selectedTutorialDish.instructions.length > 0 ? (
+                selectedTutorialDish.instructions.map((step, index) => (
+                  <div
+                    key={`${selectedTutorialDish.id}-history-tutorial-${index}`}
+                    className="rounded-2xl border border-[#eddac6] bg-white px-4 py-3 text-sm leading-6 text-[#5f4a3a]"
+                  >
+                    <span className="mr-2 inline-flex rounded-full border border-[#f2b48d] bg-[#fff1c9] px-2 py-0.5 text-xs font-semibold text-[#8c5a2b]">
+                      步骤 {index + 1}
+                    </span>
+                    {step}
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[#eddac6] bg-white px-4 py-6 text-center text-sm text-[#8c6b54]">
+                  这道菜暂时还没有补充教程文字。
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }
