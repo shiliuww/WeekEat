@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">吃什么</string>
+    <string name="title_activity_main">吃什么</string>
+    <string name="package_name">com.guanyushan.weekeat</string>
+    <string name="custom_url_scheme">com.guanyushan.weekeat</string>
+</resources>

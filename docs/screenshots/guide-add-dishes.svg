@@ -1,0 +1,57 @@
+<svg width="1280" height="760" viewBox="0 0 1280 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="760" rx="32" fill="#FFF7EB"/>
+  <rect x="40" y="40" width="1200" height="680" rx="30" fill="#FFFDF8" stroke="#3D2B1F" stroke-width="4"/>
+  <text x="80" y="112" fill="#3D2B1F" font-size="38" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">添加想吃的菜和食材</text>
+  <text x="80" y="150" fill="#8C6B54" font-size="22" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">在“记录你的胃口偏好”页面里，输入后记得点右侧“添加”，项目才会进入本轮生成。</text>
+
+  <rect x="80" y="190" width="530" height="458" rx="24" fill="#FFF8EF" stroke="#3D2B1F" stroke-width="3"/>
+  <text x="116" y="240" fill="#3D2B1F" font-size="28" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">这周想尝试的菜</text>
+
+  <rect x="116" y="274" width="314" height="72" rx="18" fill="#FFFDF8" stroke="#3D2B1F" stroke-width="2"/>
+  <text x="138" y="318" fill="#6A5444" font-size="24" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">糖醋排骨</text>
+
+  <rect x="448" y="274" width="126" height="72" rx="22" fill="url(#paint0_linear)" stroke="#3D2B1F" stroke-width="3"/>
+  <text x="484" y="318" fill="white" font-size="24" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">添加</text>
+
+  <rect x="116" y="382" width="150" height="54" rx="27" fill="#DCF6E8"/>
+  <text x="146" y="416" fill="#2D8A57" font-size="22" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">糖醋排骨 ×</text>
+
+  <rect x="282" y="382" width="150" height="54" rx="27" fill="#DCF6E8"/>
+  <text x="320" y="416" fill="#2D8A57" font-size="22" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">番茄牛腩 ×</text>
+
+  <text x="116" y="500" fill="#3D2B1F" font-size="28" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">这周想尝试的食材</text>
+  <rect x="116" y="534" width="314" height="72" rx="18" fill="#FFFDF8" stroke="#3D2B1F" stroke-width="2"/>
+  <text x="138" y="578" fill="#6A5444" font-size="24" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">虾仁</text>
+  <rect x="448" y="534" width="126" height="72" rx="22" fill="url(#paint1_linear)" stroke="#3D2B1F" stroke-width="3"/>
+  <text x="484" y="578" fill="white" font-size="24" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">添加</text>
+
+  <circle cx="720" cy="300" r="28" fill="#EF6C43"/>
+  <text x="710" y="310" fill="white" font-size="24" font-family="Arial, sans-serif" font-weight="700">1</text>
+  <path d="M690 300H610" stroke="#EF6C43" stroke-width="5" stroke-linecap="round"/>
+  <text x="770" y="290" fill="#3D2B1F" font-size="26" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">输入你想吃的菜名</text>
+  <text x="770" y="324" fill="#8C6B54" font-size="19" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">比如“糖醋排骨”“番茄牛腩”“丝瓜汤”。</text>
+
+  <circle cx="720" cy="420" r="28" fill="#EF6C43"/>
+  <text x="710" y="430" fill="white" font-size="24" font-family="Arial, sans-serif" font-weight="700">2</text>
+  <path d="M690 420H628L592 384L554 344" stroke="#EF6C43" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M541 349L554 344L551 358" fill="none" stroke="#EF6C43" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="770" y="410" fill="#3D2B1F" font-size="26" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">一定要点右边“添加”</text>
+  <text x="770" y="444" fill="#8C6B54" font-size="19" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">只有变成下面的小标签，系统才会把它算进本轮需求。</text>
+
+  <circle cx="720" cy="560" r="28" fill="#EF6C43"/>
+  <text x="710" y="570" fill="white" font-size="24" font-family="Arial, sans-serif" font-weight="700">3</text>
+  <path d="M690 560H610" stroke="#EF6C43" stroke-width="5" stroke-linecap="round"/>
+  <text x="770" y="550" fill="#3D2B1F" font-size="26" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">也可以同时补食材偏好</text>
+  <text x="770" y="584" fill="#8C6B54" font-size="19" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">食材会影响推荐方向，菜名会优先被纳入本周菜谱。</text>
+
+  <defs>
+    <linearGradient id="paint0_linear" x1="511" y1="274" x2="511" y2="346" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9A62"/>
+      <stop offset="1" stop-color="#EF6C43"/>
+    </linearGradient>
+    <linearGradient id="paint1_linear" x1="511" y1="534" x2="511" y2="606" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9A62"/>
+      <stop offset="1" stop-color="#EF6C43"/>
+    </linearGradient>
+  </defs>
+</svg>

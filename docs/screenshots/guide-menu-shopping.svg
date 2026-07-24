@@ -1,0 +1,61 @@
+<svg width="1280" height="760" viewBox="0 0 1280 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1280" height="760" rx="32" fill="#FFF7EB"/>
+  <rect x="40" y="40" width="1200" height="680" rx="30" fill="#FFFDF8" stroke="#3D2B1F" stroke-width="4"/>
+  <text x="80" y="112" fill="#3D2B1F" font-size="38" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">生成周菜单，再一键查看采购清单</text>
+  <text x="80" y="150" fill="#8C6B54" font-size="22" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">电脑端更适合横向浏览整周安排；手机端仍保持竖屏操作，方便随手查看和勾选采购项。</text>
+
+  <rect x="80" y="198" width="620" height="442" rx="24" fill="#FFF8EF" stroke="#3D2B1F" stroke-width="3"/>
+  <text x="112" y="244" fill="#3D2B1F" font-size="30" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">本周菜谱</text>
+
+  <rect x="112" y="280" width="176" height="148" rx="18" fill="white" stroke="#3D2B1F" stroke-width="2"/>
+  <text x="136" y="320" fill="#D46A4C" font-size="24" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">周一</text>
+  <text x="136" y="358" fill="#3D2B1F" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">早餐  南瓜小米鸡丝粥</text>
+  <text x="136" y="388" fill="#3D2B1F" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">午餐  糖醋排骨 + 青菜</text>
+  <text x="136" y="418" fill="#3D2B1F" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">晚餐  番茄牛腩</text>
+
+  <rect x="304" y="280" width="176" height="148" rx="18" fill="white" stroke="#3D2B1F" stroke-width="2"/>
+  <text x="328" y="320" fill="#D46A4C" font-size="24" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">周二</text>
+  <text x="328" y="358" fill="#3D2B1F" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">早餐  希腊酸奶莓果碗</text>
+  <text x="328" y="388" fill="#3D2B1F" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">午餐  照烧三文鱼饭</text>
+  <text x="328" y="418" fill="#3D2B1F" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">晚餐  丝瓜虾仁汤</text>
+
+  <rect x="496" y="280" width="176" height="148" rx="18" fill="white" stroke="#3D2B1F" stroke-width="2"/>
+  <text x="520" y="320" fill="#D46A4C" font-size="24" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">周三</text>
+  <text x="520" y="358" fill="#3D2B1F" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">早餐  菠菜蘑菇滑蛋碗</text>
+  <text x="520" y="388" fill="#3D2B1F" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">午餐  韩式彩蔬拌饭</text>
+  <text x="520" y="418" fill="#3D2B1F" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">晚餐  蒜香虾仁滑蛋</text>
+
+  <rect x="112" y="458" width="560" height="134" rx="18" fill="#FFF1C9" stroke="#3D2B1F" stroke-width="2"/>
+  <text x="140" y="500" fill="#8C5A2B" font-size="24" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">生成逻辑</text>
+  <text x="140" y="536" fill="#6A5444" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">• 想吃的菜优先纳入本周菜单</text>
+  <text x="140" y="564" fill="#6A5444" font-size="18" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">• 其余位置由营养度、喜好度、间隔度共同决定</text>
+
+  <rect x="760" y="240" width="430" height="340" rx="24" fill="#FFF8EF" stroke="#3D2B1F" stroke-width="3"/>
+  <text x="792" y="286" fill="#3D2B1F" font-size="30" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">采购清单</text>
+
+  <rect x="792" y="320" width="366" height="56" rx="16" fill="white" stroke="#E3D8CC" stroke-width="2"/>
+  <text x="820" y="355" fill="#3D2B1F" font-size="21" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">排骨</text>
+  <text x="1100" y="355" fill="#8C6B54" font-size="21" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">500 克</text>
+
+  <rect x="792" y="390" width="366" height="56" rx="16" fill="white" stroke="#E3D8CC" stroke-width="2"/>
+  <text x="820" y="425" fill="#3D2B1F" font-size="21" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">番茄</text>
+  <text x="1100" y="425" fill="#8C6B54" font-size="21" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">6 个</text>
+
+  <rect x="792" y="460" width="366" height="56" rx="16" fill="white" stroke="#E3D8CC" stroke-width="2"/>
+  <text x="820" y="495" fill="#3D2B1F" font-size="21" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">虾仁</text>
+  <text x="1084" y="495" fill="#8C6B54" font-size="21" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">2 盒</text>
+
+  <path d="M702 410C734 410 734 410 760 410" stroke="#EF6C43" stroke-width="6" stroke-linecap="round"/>
+  <path d="M748 396L770 410L748 424" stroke="#EF6C43" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="816" y="620" fill="#8C6B54" font-size="19" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">菜单确定后，食材会自动去重、汇总、分类。</text>
+
+  <rect x="760" y="612" width="430" height="68" rx="22" fill="url(#paint0_linear)" stroke="#3D2B1F" stroke-width="3"/>
+  <text x="874" y="654" fill="white" font-size="28" font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif" font-weight="700">查看采购清单</text>
+
+  <defs>
+    <linearGradient id="paint0_linear" x1="975" y1="612" x2="975" y2="680" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9A62"/>
+      <stop offset="1" stop-color="#EF6C43"/>
+    </linearGradient>
+  </defs>
+</svg>

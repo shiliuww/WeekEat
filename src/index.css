@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Trebuchet MS', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #fff7eb;
+  color: #3d2b1f;
+}
+
+@layer components {
+  .btn-primary {
+    @apply text-white font-semibold py-3 px-6 rounded-[20px] transition-all duration-200 active:scale-95;
+    background: linear-gradient(180deg, #ff9a62 0%, #ef6c43 100%);
+    box-shadow: 0 0 0 2px #3d2b1f, 5px 5px 0 0 rgba(212, 106, 76, 0.3);
+  }
+  
+  .btn-secondary {
+    @apply bg-[#fffaf2] text-[#5f4634] font-semibold py-3 px-6 rounded-[20px] transition-all duration-200 border-2 active:scale-95;
+    border-color: #3d2b1f;
+    box-shadow: 4px 4px 0 0 rgba(243, 192, 122, 0.28);
+  }
+  
+  .card {
+    @apply rounded-[28px];
+    background: #fffdf8;
+    border: 2px solid #3d2b1f;
+    box-shadow: 6px 6px 0 0 rgba(243, 192, 122, 0.28);
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 rounded-[20px] outline-none transition-all duration-200;
+    border: 2px solid #3d2b1f;
+    background: #fffdf8;
+    box-shadow: inset 0 0 0 1px rgba(255, 210, 165, 0.45);
+  }
+
+  .input-field:focus {
+    box-shadow: 0 0 0 4px rgba(255, 186, 122, 0.25);
+  }
+}

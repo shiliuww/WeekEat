@@ -1,0 +1,36 @@
+node_modules
+dist
+release-builds
+.DS_Store
+*.tsbuildinfo
+.vite
+.cache
+.npm-cache
+.env
+.env.*
+*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Electron / Capacitor
+.capacitor
+android/.gradle
+android/local.properties
+android/signing.properties
+android/*.jks
+android/*.keystore
+android/**/build
+android/app/src/main/assets/public
+android/app/src/main/assets/capacitor.config.json
+android/app/build
+android/build
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
