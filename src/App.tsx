@@ -65,6 +65,81 @@ function saveGenerationHistory(records: GenerationRecord[]): void {
   saveJson(GENERATION_HISTORY_KEY, records);
 }
 
+function formatIngredientPortion(dish: Dish, index: number): string {
+  const ingredient = dish.ingredients[index];
+  if (!ingredient) {
+    return '';
+  }
+
+  const quantity = ingredient.quantity?.trim();
+  const unit = ingredient.unit?.trim();
+  return `${quantity ?? ''}${unit ?? ''}`.trim();
+}
+
+function TutorialContent({
+  dish,
+  stepKeyPrefix,
+}: {
+  dish: Dish;
+  stepKeyPrefix: string;
+}) {
+  return (
+    <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+      <section className="rounded-2xl border border-[#eddac6] bg-white p-4">
+        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#d46a4c]">
+          食材与分量
+        </div>
+        {dish.ingredients.length > 0 ? (
+          <div className="space-y-2">
+            {dish.ingredients.map((ingredient, index) => {
+              const portion = formatIngredientPortion(dish, index);
+
+              return (
+                <div
+                  key={`${dish.id}-${stepKeyPrefix}-ingredient-${index}`}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-[#f3e4d3] bg-[#fffaf2] px-4 py-3 text-sm text-[#5f4a3a]"
+                >
+                  <span className="font-medium">{ingredient.name}</span>
+                  <span className="shrink-0 rounded-full bg-[#fff1c9] px-3 py-1 text-xs font-semibold text-[#8c5a2b]">
+                    {portion || '适量'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-[#eddac6] bg-[#fffaf2] px-4 py-6 text-center text-sm text-[#8c6b54]">
+            这道菜暂时还没有补充食材分量。
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d46a4c]">
+          做法步骤
+        </div>
+        {dish.instructions.length > 0 ? (
+          dish.instructions.map((step, index) => (
+            <div
+              key={`${dish.id}-${stepKeyPrefix}-tutorial-${index}`}
+              className="rounded-2xl border border-[#eddac6] bg-white px-4 py-3 text-sm leading-6 text-[#5f4a3a]"
+            >
+              <span className="mr-2 inline-flex rounded-full border border-[#f2b48d] bg-[#fff1c9] px-2 py-0.5 text-xs font-semibold text-[#8c5a2b]">
+                步骤 {index + 1}
+              </span>
+              {step}
+            </div>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed border-[#eddac6] bg-white px-4 py-6 text-center text-sm text-[#8c6b54]">
+            这道菜暂时还没有补充教程文字。
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 async function saveElementAsImage(
   element: HTMLElement,
   fileName: string,
@@ -78,24 +153,40 @@ async function saveElementAsImage(
   });
   const response = await fetch(dataUrl);
   const blob = await response.blob();
-  const imageFile = new File([blob], fileName, { type: 'image/png' });
+  const imageFile =
+    typeof File === 'function' ? new File([blob], fileName, { type: 'image/png' }) : null;
   const shareNavigator = navigator as Navigator & {
     canShare?: (data: ShareData) => boolean;
   };
+  const shareSupportsFiles =
+    imageFile !== null &&
+    (typeof shareNavigator.canShare !== 'function' ||
+      shareNavigator.canShare({ files: [imageFile] }));
 
-  if (navigator.share && shareNavigator.canShare?.({ files: [imageFile] })) {
-    await navigator.share({
-      files: [imageFile],
-      title: shareTitle,
-      text: shareText,
-    });
-    return;
+  if (navigator.share && shareSupportsFiles && imageFile) {
+    try {
+      await navigator.share({
+        files: [imageFile],
+        title: shareTitle,
+        text: shareText,
+      });
+      return;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
+      console.warn('系统分享失败，已回退为下载图片:', error);
+    }
   }
 
+  const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = dataUrl;
+  link.href = objectUrl;
   link.download = fileName;
+  document.body.appendChild(link);
   link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 }
 
 function buildGenerationRecord(
@@ -908,25 +999,7 @@ function MenuView({ weeklyMenu, onShopping, onBack, onRegenerate, isGenerating }
               </button>
             </div>
 
-            <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
-              {selectedTutorialDish.instructions.length > 0 ? (
-                selectedTutorialDish.instructions.map((step, index) => (
-                  <div
-                    key={`${selectedTutorialDish.id}-tutorial-${index}`}
-                    className="rounded-2xl border border-[#eddac6] bg-white px-4 py-3 text-sm leading-6 text-[#5f4a3a]"
-                  >
-                    <span className="mr-2 inline-flex rounded-full border border-[#f2b48d] bg-[#fff1c9] px-2 py-0.5 text-xs font-semibold text-[#8c5a2b]">
-                      步骤 {index + 1}
-                    </span>
-                    {step}
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-dashed border-[#eddac6] bg-white px-4 py-6 text-center text-sm text-[#8c6b54]">
-                  这道菜暂时还没有补充教程文字。
-                </div>
-              )}
-            </div>
+            <TutorialContent dish={selectedTutorialDish} stepKeyPrefix="menu" />
           </div>
         </div>
       )}
@@ -1068,7 +1141,6 @@ function ShoppingView({ shoppingList, selectedItems, onToggleItem, onBack }: {
           <span className="rounded-full border border-[#efcfaa] bg-[#fff1c9] px-3 py-1 font-semibold">
             已选 {selectedItems.size} / {shoppingList.length} 项
           </span>
-          <span>横屏下会按分类分栏展示，勾选时不会再挤压错位。</span>
           <button
             onClick={handleSaveImage}
             disabled={isSavingImage}
@@ -1409,25 +1481,7 @@ function HistoryView({
               </button>
             </div>
 
-            <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
-              {selectedTutorialDish.instructions.length > 0 ? (
-                selectedTutorialDish.instructions.map((step, index) => (
-                  <div
-                    key={`${selectedTutorialDish.id}-history-tutorial-${index}`}
-                    className="rounded-2xl border border-[#eddac6] bg-white px-4 py-3 text-sm leading-6 text-[#5f4a3a]"
-                  >
-                    <span className="mr-2 inline-flex rounded-full border border-[#f2b48d] bg-[#fff1c9] px-2 py-0.5 text-xs font-semibold text-[#8c5a2b]">
-                      步骤 {index + 1}
-                    </span>
-                    {step}
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-dashed border-[#eddac6] bg-white px-4 py-6 text-center text-sm text-[#8c6b54]">
-                  这道菜暂时还没有补充教程文字。
-                </div>
-              )}
-            </div>
+            <TutorialContent dish={selectedTutorialDish} stepKeyPrefix="history" />
           </div>
         </div>
       )}

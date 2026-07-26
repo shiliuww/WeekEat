@@ -1,13 +1,12 @@
 {
-  "version": "1.0.1",
-  "title": "WeekEat v1.0.1",
-  "publishedAt": "2026-07-24",
-  "releaseUrl": "https://github.com/shiliuww/WeekEat/releases/latest",
+  "version": "1.0.2",
+  "title": "WeekEat v1.0.2",
+  "publishedAt": "2026-07-26",
+  "releaseUrl": "https://github.com/shiliuww/WeekEat/releases/tag/v1.0.2",
   "releaseNotes": [
-    "新增菜谱保存图片与采购清单保存图片功能。",
-    "新增历史生成记录查看与删除能力。",
-    "修复想吃的食材或菜名未稳定出现在生成菜单中的问题。",
-    "更新应用图标，统一桌面端与 Android 端显示。"
+    "修复保存图片时无法稳定调起系统分享或保存到相册的问题。",
+    "一周菜谱中的教程弹窗新增食材与分量展示，查看做法更完整。",
+    "移除采购清单页中多余的横屏说明文案。"
   ],
   "forceUpdate": false
 }
