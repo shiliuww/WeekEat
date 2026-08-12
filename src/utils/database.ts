@@ -9,7 +9,7 @@ const DB_KEYS = {
   PRESET_VERSION: 'recipe_preset_version',
 };
 
-const PRESET_LIBRARY_VERSION = 'weekeat-preset-20260724';
+const PRESET_LIBRARY_VERSION = 'weekeat-preset-20260808';
 
 const DEFAULT_PREFERENCES: UserPreference = {
   dislikedIngredients: [],

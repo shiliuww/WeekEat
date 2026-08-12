@@ -29,9 +29,12 @@ type RecipeSeed = {
 const EFFECTIVE_TAGS = [
   '早餐',
   '完整一餐',
+  '三明治',
+  '卷饼',
+  '蒸菜',
+  '汤品',
   '荤菜',
   '素菜',
-  '汤品',
   '高蛋白',
   '高纤维',
   '家常',
@@ -39,9 +42,6 @@ const EFFECTIVE_TAGS = [
   '快手',
   '下饭',
   '饱腹',
-  '蒸菜',
-  '三明治',
-  '卷饼',
 ] as const;
 
 const today = new Date().toISOString().split('T')[0];
@@ -76,6 +76,7 @@ const ingredientMeta: Record<string, { quantity: string; unit: string; category:
   全麦意面: { quantity: '70', unit: '克', category: 'grain' },
   意面: { quantity: '70', unit: '克', category: 'grain' },
   荞麦面: { quantity: '70', unit: '克', category: 'grain' },
+  挂面: { quantity: '70', unit: '克', category: 'grain' },
   粉丝: { quantity: '40', unit: '克', category: 'grain' },
   鸡蛋: { quantity: '2', unit: '个', category: 'other' },
   鸡胸肉: { quantity: '140', unit: '克', category: 'meat' },
@@ -83,6 +84,9 @@ const ingredientMeta: Record<string, { quantity: string; unit: string; category:
   鸡翅: { quantity: '6', unit: '个', category: 'meat' },
   鸡蓉: { quantity: '90', unit: '克', category: 'meat' },
   鸡丝: { quantity: '90', unit: '克', category: 'meat' },
+  鸭肉: { quantity: '140', unit: '克', category: 'meat' },
+  鸭腿肉: { quantity: '160', unit: '克', category: 'meat' },
+  羊肉: { quantity: '150', unit: '克', category: 'meat' },
   牛肉: { quantity: '140', unit: '克', category: 'meat' },
   牛柳: { quantity: '140', unit: '克', category: 'meat' },
   牛腩: { quantity: '160', unit: '克', category: 'meat' },
@@ -141,15 +145,19 @@ const ingredientMeta: Record<string, { quantity: string; unit: string; category:
   金针菇: { quantity: '100', unit: '克', category: 'vegetable' },
   丝瓜: { quantity: '1', unit: '根', category: 'vegetable' },
   冬瓜: { quantity: '200', unit: '克', category: 'vegetable' },
+  白萝卜: { quantity: '180', unit: '克', category: 'vegetable' },
   黄瓜: { quantity: '1', unit: '根', category: 'vegetable' },
   木耳: { quantity: '80', unit: '克', category: 'vegetable' },
   青椒: { quantity: '1', unit: '个', category: 'vegetable' },
   彩椒: { quantity: '120', unit: '克', category: 'vegetable' },
+  小米椒: { quantity: '2', unit: '个', category: 'vegetable' },
   洋葱: { quantity: '80', unit: '克', category: 'vegetable' },
+  子姜: { quantity: '80', unit: '克', category: 'vegetable' },
   豆角: { quantity: '120', unit: '克', category: 'vegetable' },
   荷兰豆: { quantity: '120', unit: '克', category: 'vegetable' },
   白菜: { quantity: '180', unit: '克', category: 'vegetable' },
   娃娃菜: { quantity: '180', unit: '克', category: 'vegetable' },
+  包菜: { quantity: '180', unit: '克', category: 'vegetable' },
   上海青: { quantity: '180', unit: '克', category: 'vegetable' },
   油麦菜: { quantity: '180', unit: '克', category: 'vegetable' },
   空心菜: { quantity: '180', unit: '克', category: 'vegetable' },
@@ -157,6 +165,9 @@ const ingredientMeta: Record<string, { quantity: string; unit: string; category:
   豆苗: { quantity: '150', unit: '克', category: 'vegetable' },
   茼蒿: { quantity: '150', unit: '克', category: 'vegetable' },
   苦菊: { quantity: '120', unit: '克', category: 'vegetable' },
+  蒜苔: { quantity: '120', unit: '克', category: 'vegetable' },
+  青蒜: { quantity: '90', unit: '克', category: 'vegetable' },
+  蒜苗: { quantity: '90', unit: '克', category: 'vegetable' },
   胡萝卜: { quantity: '80', unit: '克', category: 'vegetable' },
   土豆: { quantity: '120', unit: '克', category: 'vegetable' },
   莲藕: { quantity: '120', unit: '克', category: 'vegetable' },
@@ -164,12 +175,21 @@ const ingredientMeta: Record<string, { quantity: string; unit: string; category:
   紫甘蓝: { quantity: '80', unit: '克', category: 'vegetable' },
   秋葵: { quantity: '120', unit: '克', category: 'vegetable' },
   海带: { quantity: '80', unit: '克', category: 'vegetable' },
+  酸萝卜: { quantity: '100', unit: '克', category: 'vegetable' },
   百合: { quantity: '60', unit: '克', category: 'vegetable' },
   莴笋: { quantity: '100', unit: '克', category: 'vegetable' },
   小白菜: { quantity: '180', unit: '克', category: 'vegetable' },
   西葫芦: { quantity: '150', unit: '克', category: 'vegetable' },
   菜花: { quantity: '160', unit: '克', category: 'vegetable' },
+  黄豆芽: { quantity: '150', unit: '克', category: 'vegetable' },
   海苔: { quantity: '2', unit: '片', category: 'other' },
+  剁椒: { quantity: '1', unit: '勺', category: 'seasoning' },
+  豆豉: { quantity: '1', unit: '勺', category: 'seasoning' },
+  孜然: { quantity: '1', unit: '勺', category: 'seasoning' },
+  鱼片: { quantity: '140', unit: '克', category: 'meat' },
+  鱼块: { quantity: '160', unit: '克', category: 'meat' },
+  鱼丸: { quantity: '120', unit: '克', category: 'meat' },
+  花甲: { quantity: '180', unit: '克', category: 'meat' },
   蛤蜊: { quantity: '150', unit: '克', category: 'meat' },
 };
 
@@ -183,18 +203,20 @@ function inferredIngredient(name: string): Ingredient {
   if (exact) return exact;
 
   if (/鸡/.test(name) && !/鸡蛋/.test(name)) return { name, quantity: '140', unit: '克', category: 'meat' };
+  if (/鸭/.test(name)) return { name, quantity: '150', unit: '克', category: 'meat' };
+  if (/羊/.test(name)) return { name, quantity: '150', unit: '克', category: 'meat' };
   if (/牛/.test(name)) return { name, quantity: '140', unit: '克', category: 'meat' };
   if (/猪|排骨|丸子|肉片|肉丝|肉卷|肉饼|里脊/.test(name)) return { name, quantity: '150', unit: '克', category: 'meat' };
-  if (/虾|鱼|鲈|鳕|三文鱼|巴沙|龙利|蛤蜊|猪肝/.test(name)) return { name, quantity: '120', unit: '克', category: 'meat' };
+  if (/虾|鱼|鲈|鳕|三文鱼|巴沙|龙利|蛤蜊|花甲|猪肝/.test(name)) return { name, quantity: '120', unit: '克', category: 'meat' };
   if (/豆腐|豆皮|豆干|腐竹|豆泡/.test(name)) return { name, quantity: '180', unit: '克', category: 'other' };
   if (/酸奶|牛奶|豆浆|豆乳/.test(name)) return { name, quantity: '200', unit: '毫升', category: 'other' };
-  if (/吐司|卷饼|意面|荞麦面|米饭|大米|藜麦|小米|燕麦|红薯|紫薯|玉米|板栗|芋头/.test(name)) {
+  if (/吐司|卷饼|意面|荞麦面|挂面|米饭|大米|藜麦|小米|燕麦|红薯|紫薯|玉米|板栗|芋头/.test(name)) {
     return { name, quantity: '60', unit: '克', category: 'grain' };
   }
   if (/苹果|香蕉|蓝莓|草莓|木瓜|牛油果|红枣|山楂/.test(name)) {
     return { name, quantity: '1', unit: '份', category: 'fruit' };
   }
-  if (/桂花|黑芝麻|奇亚籽|花生酱|蒜|黑胡椒/.test(name)) {
+  if (/桂花|黑芝麻|奇亚籽|花生酱|蒜|黑胡椒|剁椒|豆豉|孜然/.test(name)) {
     return { name, quantity: '少许', unit: '', category: 'seasoning' };
   }
   if (/花生|核桃|腰果/.test(name)) return { name, quantity: '12', unit: '克', category: 'other' };
@@ -574,6 +596,12 @@ const completeMealSeeds: RecipeSeed[] = [
   { id: 'm-28', name: '鳕鱼芦笋三明治', style: 'sandwich', category: 'lunch', difficulty: 'easy', timeNeeded: 15, tags: ['完整一餐', '三明治', '高蛋白'], ingredients: ['全麦吐司', '鳕鱼', '芦笋', '番茄'], isCompleteMeal: true },
   { id: 'm-29', name: '烤南瓜鸡胸卷饼', style: 'wrap', category: 'lunch', difficulty: 'easy', timeNeeded: 15, tags: ['完整一餐', '卷饼', '便捷'], ingredients: ['南瓜', '鸡胸肉', '全麦卷饼', '生菜'], isCompleteMeal: true },
   { id: 'm-30', name: '香草豆腐彩蔬三明治', style: 'sandwich', category: 'lunch', difficulty: 'easy', timeNeeded: 12, tags: ['完整一餐', '三明治', '素食友好'], ingredients: ['全麦吐司', '豆腐', '彩椒', '生菜'], isCompleteMeal: true },
+  { id: 'm-31', name: '芋头鸭块焖饭', style: 'complete', category: 'dinner', difficulty: 'medium', timeNeeded: 30, tags: ['完整一餐', '家常', '温暖'], ingredients: ['芋头', '鸭腿肉', '大米', '青菜'], isCompleteMeal: true },
+  { id: 'm-32', name: '羊肉胡萝卜焖饭', style: 'complete', category: 'dinner', difficulty: 'medium', timeNeeded: 30, tags: ['完整一餐', '家常', '饱腹'], ingredients: ['羊肉', '胡萝卜', '大米', '洋葱'], isCompleteMeal: true },
+  { id: 'm-33', name: '香菇肉末焖饭', style: 'complete', category: 'lunch', difficulty: 'easy', timeNeeded: 22, tags: ['完整一餐', '家常', '下饭'], ingredients: ['香菇', '肉末', '大米', '青豆'], isCompleteMeal: true },
+  { id: 'm-34', name: '番茄鱼片面', style: 'complete', category: 'dinner', difficulty: 'easy', timeNeeded: 20, tags: ['完整一餐', '清爽', '高蛋白'], ingredients: ['番茄', '鱼片', '挂面', '青菜'], isCompleteMeal: true },
+  { id: 'm-35', name: '鸭丝青菜面', style: 'complete', category: 'lunch', difficulty: 'easy', timeNeeded: 18, tags: ['完整一餐', '家常', '清爽'], ingredients: ['鸭肉', '挂面', '青菜', '香菇'], isCompleteMeal: true },
+  { id: 'm-36', name: '羊肉白菜面', style: 'complete', category: 'dinner', difficulty: 'easy', timeNeeded: 20, tags: ['完整一餐', '温暖', '饱腹'], ingredients: ['羊肉', '白菜', '挂面', '胡萝卜'], isCompleteMeal: true },
 ];
 
 const proteinSeeds: RecipeSeed[] = [
@@ -657,6 +685,58 @@ const proteinSeeds: RecipeSeed[] = [
   { id: 'p-78', name: '金针菇豆腐蒸盅', style: 'steam', category: 'dinner', difficulty: 'easy', timeNeeded: 15, tags: ['荤菜', '嫩滑', '轻负担'], ingredients: ['金针菇', '豆腐', '鸡蛋'] },
   { id: 'p-79', name: '山药木耳蒸蛋', style: 'steam', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['荤菜', '清爽', '家常'], ingredients: ['山药', '木耳', '鸡蛋'] },
   { id: 'p-80', name: '西兰花鸡蛋豆腐煲', style: 'braise', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '高蛋白', '轻油'], ingredients: ['西兰花', '鸡蛋', '豆腐'] },
+  { id: 'p-81', name: '子姜炒鸭片', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 18, tags: ['荤菜', '家常', '下饭'], ingredients: ['子姜', '鸭肉', '青椒'] },
+  { id: 'p-82', name: '莲藕焖鸭', style: 'braise', category: 'dinner', difficulty: 'medium', timeNeeded: 32, tags: ['荤菜', '家常', '下饭'], ingredients: ['莲藕', '鸭腿肉', '姜片'] },
+  { id: 'p-83', name: '香菇烧鸭块', style: 'braise', category: 'dinner', difficulty: 'medium', timeNeeded: 30, tags: ['荤菜', '家常', '下饭'], ingredients: ['香菇', '鸭腿肉', '洋葱'] },
+  { id: 'p-84', name: '土豆焖鸭块', style: 'braise', category: 'dinner', difficulty: 'medium', timeNeeded: 32, tags: ['荤菜', '家常', '饱腹'], ingredients: ['土豆', '鸭腿肉', '彩椒'] },
+  { id: 'p-85', name: '冬瓜老鸭汤', style: 'soup', category: 'dinner', difficulty: 'medium', timeNeeded: 28, tags: ['荤菜', '汤品', '清爽'], ingredients: ['冬瓜', '鸭腿肉', '姜片'] },
+  { id: 'p-86', name: '酸萝卜鸭汤', style: 'soup', category: 'dinner', difficulty: 'medium', timeNeeded: 28, tags: ['荤菜', '汤品', '开胃'], ingredients: ['酸萝卜', '鸭腿肉', '姜片'] },
+  { id: 'p-87', name: '芋头烧鸭', style: 'braise', category: 'dinner', difficulty: 'medium', timeNeeded: 30, tags: ['荤菜', '家常', '下饭'], ingredients: ['芋头', '鸭腿肉', '洋葱'] },
+  { id: 'p-88', name: '青椒炒鸭丝', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '家常', '快手'], ingredients: ['青椒', '鸭肉', '洋葱'] },
+  { id: 'p-89', name: '葱爆羊肉', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '家常', '下饭'], ingredients: ['羊肉', '洋葱', '小葱'] },
+  { id: 'p-90', name: '孜然洋葱羊肉', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '有食欲', '下饭'], ingredients: ['羊肉', '洋葱', '孜然'] },
+  { id: 'p-91', name: '白萝卜炖羊肉', style: 'braise', category: 'dinner', difficulty: 'medium', timeNeeded: 34, tags: ['荤菜', '家常', '温暖'], ingredients: ['白萝卜', '羊肉', '姜片'] },
+  { id: 'p-92', name: '山药羊肉汤', style: 'soup', category: 'dinner', difficulty: 'medium', timeNeeded: 26, tags: ['荤菜', '汤品', '温和'], ingredients: ['山药', '羊肉', '姜片'] },
+  { id: 'p-93', name: '番茄土豆炖羊肉', style: 'braise', category: 'dinner', difficulty: 'medium', timeNeeded: 34, tags: ['荤菜', '家常', '下饭'], ingredients: ['番茄', '土豆', '羊肉'] },
+  { id: 'p-94', name: '芹菜炒羊肉', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '家常', '快手'], ingredients: ['香芹', '羊肉', '洋葱'] },
+  { id: 'p-95', name: '洋葱青椒羊肉片', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '下饭', '快手'], ingredients: ['洋葱', '青椒', '羊肉'] },
+  { id: 'p-96', name: '白菜粉丝羊肉煲', style: 'braise', category: 'dinner', difficulty: 'medium', timeNeeded: 22, tags: ['荤菜', '汤汁感', '家常'], ingredients: ['白菜', '粉丝', '羊肉'] },
+  { id: 'p-97', name: '蒜苔肉丝', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['荤菜', '家常', '快手'], ingredients: ['蒜苔', '里脊肉', '胡萝卜'] },
+  { id: 'p-98', name: '木须肉', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '家常', '下饭'], ingredients: ['鸡蛋', '黄瓜', '里脊肉', '木耳'] },
+  { id: 'p-99', name: '莴笋肉片', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 15, tags: ['荤菜', '家常', '清爽'], ingredients: ['莴笋', '肉片', '胡萝卜'] },
+  { id: 'p-100', name: '青蒜肉片', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['荤菜', '家常', '快手'], ingredients: ['青蒜', '肉片', '洋葱'] },
+  { id: 'p-101', name: '杏鲍菇肉片', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 15, tags: ['荤菜', '家常', '清爽'], ingredients: ['杏鲍菇', '肉片', '彩椒'] },
+  { id: 'p-102', name: '西葫芦肉片', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['荤菜', '家常', '快手'], ingredients: ['西葫芦', '肉片', '胡萝卜'] },
+  { id: 'p-103', name: '花菜肉片', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 15, tags: ['荤菜', '家常', '下饭'], ingredients: ['花菜', '肉片', '彩椒'] },
+  { id: 'p-104', name: '黄豆芽炒肉丝', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['荤菜', '家常', '快手'], ingredients: ['黄豆芽', '里脊肉', '胡萝卜'] },
+  { id: 'p-105', name: '包菜粉丝肉丝', style: 'braise', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '家常', '下饭'], ingredients: ['包菜', '粉丝', '里脊肉'] },
+  { id: 'p-106', name: '豆角茄子肉末', style: 'braise', category: 'dinner', difficulty: 'medium', timeNeeded: 18, tags: ['荤菜', '下饭', '家常'], ingredients: ['豆角', '茄子', '肉末'] },
+  { id: 'p-107', name: '娃娃菜粉丝肉末煲', style: 'braise', category: 'dinner', difficulty: 'easy', timeNeeded: 18, tags: ['荤菜', '家常', '汤汁感'], ingredients: ['娃娃菜', '粉丝', '肉末'] },
+  { id: 'p-108', name: '腐竹烧肉片', style: 'braise', category: 'dinner', difficulty: 'medium', timeNeeded: 20, tags: ['荤菜', '家常', '下饭'], ingredients: ['腐竹', '肉片', '胡萝卜'] },
+  { id: 'p-109', name: '蒜苗香干肉丝', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 15, tags: ['荤菜', '家常', '快手'], ingredients: ['蒜苗', '豆干', '里脊肉'] },
+  { id: 'p-110', name: '香菇蒸肉饼', style: 'steam', category: 'dinner', difficulty: 'easy', timeNeeded: 20, tags: ['荤菜', '蒸菜', '家常'], ingredients: ['香菇', '肉饼', '鸡蛋'] },
+  { id: 'p-111', name: '豆豉蒸鱼块', style: 'steam', category: 'dinner', difficulty: 'easy', timeNeeded: 18, tags: ['荤菜', '蒸菜', '下饭'], ingredients: ['豆豉', '鱼块', '姜片'] },
+  { id: 'p-112', name: '剁椒鱼块', style: 'steam', category: 'dinner', difficulty: 'easy', timeNeeded: 18, tags: ['荤菜', '蒸菜', '有食欲'], ingredients: ['剁椒', '鱼块', '姜片'] },
+  { id: 'p-113', name: '番茄鱼片豆腐煲', style: 'braise', category: 'dinner', difficulty: 'easy', timeNeeded: 18, tags: ['荤菜', '嫩滑', '下饭'], ingredients: ['番茄', '鱼片', '豆腐'] },
+  { id: 'p-114', name: '菌菇鱼片汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '汤品', '清爽'], ingredients: ['口蘑', '香菇', '鱼片'] },
+  { id: 'p-115', name: '白菜鱼丸汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['荤菜', '汤品', '家常'], ingredients: ['白菜', '鱼丸', '姜片'] },
+  { id: 'p-116', name: '丝瓜虾仁汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['荤菜', '汤品', '鲜甜'], ingredients: ['丝瓜', '虾仁', '姜片'] },
+  { id: 'p-117', name: '玉子虾仁', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['荤菜', '嫩滑', '快手'], ingredients: ['鸡蛋', '虾仁', '香菇'] },
+  { id: 'p-118', name: '茄汁虾仁豆腐', style: 'braise', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '嫩滑', '下饭'], ingredients: ['番茄', '虾仁', '豆腐'] },
+  { id: 'p-119', name: '黄瓜虾仁炒蛋', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 12, tags: ['荤菜', '家常', '快手'], ingredients: ['黄瓜', '虾仁', '鸡蛋'] },
+  { id: 'p-120', name: '豆苗鱼片汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['荤菜', '汤品', '清爽'], ingredients: ['豆苗', '鱼片', '姜片'] },
+  { id: 'p-121', name: '花甲豆腐汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '汤品', '鲜味'], ingredients: ['花甲', '豆腐', '姜片'] },
+  { id: 'p-122', name: '紫菜鱼丸汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 12, tags: ['荤菜', '汤品', '快手'], ingredients: ['紫菜', '鱼丸', '豆腐'] },
+  { id: 'p-123', name: '农家一碗香轻油版', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['荤菜', '家常', '下饭'], ingredients: ['鸡蛋', '青椒', '里脊肉'] },
+  { id: 'p-124', name: '小炒黄牛肉轻油版', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 15, tags: ['荤菜', '有食欲', '下饭'], ingredients: ['牛肉', '小米椒', '香菜'] },
+  { id: 'p-125', name: '小炒肉轻油版', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 15, tags: ['荤菜', '家常', '下饭'], ingredients: ['青椒', '里脊肉', '小米椒'] },
+  { id: 'p-126', name: '豉汁蒸鸡翅', style: 'steam', category: 'dinner', difficulty: 'easy', timeNeeded: 20, tags: ['荤菜', '蒸菜', '下饭'], ingredients: ['豆豉', '鸡翅', '姜片'] },
+  { id: 'p-127', name: '白菜粉丝羊肉汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 18, tags: ['荤菜', '汤品', '温暖'], ingredients: ['白菜', '粉丝', '羊肉'] },
+  { id: 'p-128', name: '莲藕鸭汤', style: 'soup', category: 'dinner', difficulty: 'medium', timeNeeded: 24, tags: ['荤菜', '汤品', '家常'], ingredients: ['莲藕', '鸭腿肉', '姜片'] },
+  { id: 'p-129', name: '番茄土豆羊肉汤', style: 'soup', category: 'dinner', difficulty: 'medium', timeNeeded: 24, tags: ['荤菜', '汤品', '温暖'], ingredients: ['番茄', '土豆', '羊肉'] },
+  { id: 'p-130', name: '菌菇肉片汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['荤菜', '汤品', '清爽'], ingredients: ['口蘑', '香菇', '肉片'] },
+  { id: 'p-131', name: '黄豆芽肉丝汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['荤菜', '汤品', '家常'], ingredients: ['黄豆芽', '里脊肉', '姜片'] },
+  { id: 'p-132', name: '豆腐鱼片汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 15, tags: ['荤菜', '汤品', '鲜甜'], ingredients: ['豆腐', '鱼片', '白菜'] },
 ];
 
 const vegetableSeeds: RecipeSeed[] = [
@@ -710,6 +790,14 @@ const vegetableSeeds: RecipeSeed[] = [
   { id: 'v-48', name: '番茄土豆蔬菜汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['汤品', '家常', '顺口'], ingredients: ['番茄', '土豆', '胡萝卜'] },
   { id: 'v-49', name: '山药枸杞鸡汤', style: 'soup', category: 'dinner', difficulty: 'medium', timeNeeded: 24, tags: ['汤品', '温和', '滋味足'], ingredients: ['山药', '枸杞', '鸡腿肉'] },
   { id: 'v-50', name: '菠菜猪肝汤', style: 'soup', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['汤品', '家常', '高蛋白'], ingredients: ['菠菜', '猪肝', '姜片'] },
+  { id: 'v-51', name: '干煸豆角轻油版', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['素菜', '家常', '下饭'], ingredients: ['豆角', '大蒜', '小米椒'] },
+  { id: 'v-52', name: '家常豆腐', style: 'braise', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['素菜', '家常', '下饭'], ingredients: ['豆腐', '青椒', '木耳'] },
+  { id: 'v-53', name: '地三鲜轻油版', style: 'braise', category: 'dinner', difficulty: 'easy', timeNeeded: 18, tags: ['素菜', '家常', '下饭'], ingredients: ['土豆', '茄子', '青椒'] },
+  { id: 'v-54', name: '干锅花菜轻油版', style: 'stirfry', category: 'dinner', difficulty: 'easy', timeNeeded: 16, tags: ['素菜', '有食欲', '下饭'], ingredients: ['花菜', '彩椒', '洋葱'] },
+  { id: 'v-55', name: '剁椒蒸金针菇', style: 'steam', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['素菜', '蒸菜', '下饭'], ingredients: ['剁椒', '金针菇', '大蒜'] },
+  { id: 'v-56', name: '剁椒蒸娃娃菜', style: 'steam', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['素菜', '蒸菜', '清爽'], ingredients: ['剁椒', '娃娃菜', '大蒜'] },
+  { id: 'v-57', name: '剁椒蒸豆腐', style: 'steam', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['素菜', '蒸菜', '嫩滑'], ingredients: ['剁椒', '豆腐', '小葱'] },
+  { id: 'v-58', name: '蒜蓉蒸南瓜', style: 'steam', category: 'dinner', difficulty: 'easy', timeNeeded: 14, tags: ['素菜', '蒸菜', '清爽'], ingredients: ['南瓜', '大蒜', '小葱'] },
 ];
 
 export const recipeDatabase: Dish[] = [
