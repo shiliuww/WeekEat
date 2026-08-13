@@ -69,6 +69,7 @@ export interface GenerationRecord {
   createdAt: string;
   weeklyMenu: DailyMenu[];
   shoppingList: ShoppingItem[];
+  completedMenuItemKeys?: string[];
   desiredIngredients: string[];
   desiredDishes: string[];
   userDishNames: string[];

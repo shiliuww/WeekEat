@@ -1,7 +1,8 @@
 import { appStorage } from './storage';
 
-const UPDATE_MANIFEST_URL =
-  'https://cdn.jsdelivr.net/gh/shiliuww/WeekEat@main/public/version.json';
+const LATEST_RELEASE_API_URL =
+  'https://api.github.com/repos/shiliuww/WeekEat/releases/latest';
+const DEFAULT_RELEASE_URL = 'https://github.com/shiliuww/WeekEat/releases/latest';
 const UPDATE_DISMISS_KEY = 'weekeat_update_dismissed_version';
 
 export const CURRENT_APP_VERSION = __APP_VERSION__;
@@ -18,6 +19,16 @@ export type UpdateManifest = {
 export type AvailableUpdate = UpdateManifest & {
   currentVersion: string;
   releaseNotes: string[];
+};
+
+type GitHubReleaseResponse = {
+  tag_name?: string;
+  name?: string;
+  body?: string;
+  html_url?: string;
+  published_at?: string;
+  draft?: boolean;
+  prerelease?: boolean;
 };
 
 declare global {
@@ -74,6 +85,41 @@ function normalizeReleaseNotes(notes?: string[] | string): string[] {
   return [];
 }
 
+function normalizePublishedAt(dateString?: string): string | undefined {
+  if (!dateString) {
+    return undefined;
+  }
+
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    return dateString;
+  }
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate()
+  ).padStart(2, '0')}`;
+}
+
+function parseGitHubRelease(payload: GitHubReleaseResponse): UpdateManifest | null {
+  if (payload.draft || payload.prerelease) {
+    return null;
+  }
+
+  const version = payload.tag_name?.trim().replace(/^v/i, '');
+  if (!version) {
+    return null;
+  }
+
+  return {
+    version,
+    title: payload.name?.trim() || `WeekEat v${version}`,
+    releaseNotes: normalizeReleaseNotes(payload.body),
+    releaseUrl: payload.html_url?.trim() || DEFAULT_RELEASE_URL,
+    publishedAt: normalizePublishedAt(payload.published_at),
+    forceUpdate: false,
+  };
+}
+
 export function dismissUpdateReminder(version: string): void {
   appStorage.setItem(UPDATE_DISMISS_KEY, version);
 }
@@ -95,7 +141,10 @@ export function openUpdateLink(url?: string): void {
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
-export async function checkForAppUpdate(): Promise<AvailableUpdate | null> {
+export async function checkForAppUpdate(options?: {
+  ignoreDismissedVersion?: boolean;
+  throwOnError?: boolean;
+}): Promise<AvailableUpdate | null> {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -104,16 +153,23 @@ export async function checkForAppUpdate(): Promise<AvailableUpdate | null> {
   const timeoutId = window.setTimeout(() => controller.abort(), 8000);
 
   try {
-    const response = await fetch(`${UPDATE_MANIFEST_URL}?t=${Date.now()}`, {
+    const response = await fetch(`${LATEST_RELEASE_API_URL}?t=${Date.now()}`, {
       cache: 'no-store',
       signal: controller.signal,
+      headers: {
+        Accept: 'application/vnd.github+json',
+      },
     });
 
     if (!response.ok) {
-      throw new Error(`更新清单请求失败: ${response.status}`);
+      throw new Error(`GitHub Release 请求失败: ${response.status}`);
     }
 
-    const manifest = (await response.json()) as UpdateManifest;
+    const manifest = parseGitHubRelease((await response.json()) as GitHubReleaseResponse);
+    if (!manifest) {
+      return null;
+    }
+
     const remoteVersion = manifest.version?.trim();
 
     if (!remoteVersion) {
@@ -125,7 +181,11 @@ export async function checkForAppUpdate(): Promise<AvailableUpdate | null> {
     }
 
     const dismissedVersion = appStorage.getItem(UPDATE_DISMISS_KEY);
-    if (!manifest.forceUpdate && dismissedVersion === remoteVersion) {
+    if (
+      !options?.ignoreDismissedVersion &&
+      !manifest.forceUpdate &&
+      dismissedVersion === remoteVersion
+    ) {
       return null;
     }
 
@@ -137,6 +197,9 @@ export async function checkForAppUpdate(): Promise<AvailableUpdate | null> {
     };
   } catch (error) {
     console.warn('检查更新失败，已跳过本次自动提醒:', error);
+    if (options?.throwOnError) {
+      throw error;
+    }
     return null;
   } finally {
     window.clearTimeout(timeoutId);

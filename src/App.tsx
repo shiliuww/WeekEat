@@ -11,8 +11,9 @@ import { twMerge } from 'tailwind-merge';
 import { loadConfig, saveConfig, validateConfig, AppConfig, PROVIDERS, Provider, supportsVision } from './utils/config';
 import { loadJson, saveJson } from './utils/storage';
 import { toPng } from 'html-to-image';
-import { checkForAppUpdate, dismissUpdateReminder, openUpdateLink } from './utils/updateChecker';
+import { checkForAppUpdate, CURRENT_APP_VERSION, dismissUpdateReminder, openUpdateLink } from './utils/updateChecker';
 import type { AvailableUpdate } from './utils/updateChecker';
+import { downloadBackupSnapshot, parseBackupFile, restoreBackupSnapshot } from './utils/backup';
 
 function cn(...inputs: any[]) {
   return twMerge(clsx(inputs));
@@ -201,6 +202,7 @@ function buildGenerationRecord(
     createdAt: new Date().toISOString(),
     weeklyMenu,
     shoppingList,
+    completedMenuItemKeys: [],
     desiredIngredients: [...desiredIngredients],
     desiredDishes: [...desiredDishes],
     userDishNames: userDishes.map((dish) => dish.name),
@@ -240,6 +242,27 @@ function App() {
   useEffect(() => {
     aiService.updateConfig(config);
   }, [config]);
+
+  const handleManualCheckUpdate = async (): Promise<
+    { status: 'available'; version: string } | { status: 'latest'; version: string } | { status: 'error' }
+  > => {
+    try {
+      const update = await checkForAppUpdate({
+        ignoreDismissedVersion: true,
+        throwOnError: true,
+      });
+
+      if (update) {
+        setAvailableUpdate(update);
+        return { status: 'available', version: update.version };
+      }
+
+      return { status: 'latest', version: CURRENT_APP_VERSION };
+    } catch (error) {
+      console.error('手动检查更新失败:', error);
+      return { status: 'error' };
+    }
+  };
 
   useEffect(() => {
     saveJson(APP_STATE_KEY, {
@@ -414,6 +437,7 @@ function App() {
                 setConfig(newConfig);
                 saveConfig(newConfig);
               }}
+              onManualCheckUpdate={handleManualCheckUpdate}
               onBack={() => setView('home')}
             />
           )}
@@ -440,6 +464,11 @@ function App() {
               key="history"
               records={generationHistory}
               onBack={() => setView('home')}
+              onReplaceRecord={(updatedRecord) =>
+                setGenerationHistory((prev) =>
+                  prev.map((record) => (record.id === updatedRecord.id ? updatedRecord : record))
+                )
+              }
               onDeleteRecord={(recordId) =>
                 setGenerationHistory((prev) => prev.filter((record) => record.id !== recordId))
               }
@@ -1011,10 +1040,16 @@ function MealCard({
   meal,
   label,
   onOpenTutorial,
+  checkedDishKeys,
+  getDishEntryKey,
+  onToggleDish,
 }: {
   meal: any;
   label: string;
   onOpenTutorial: (dish: Dish) => void;
+  checkedDishKeys?: Set<string>;
+  getDishEntryKey?: (dish: Dish, index: number) => string;
+  onToggleDish?: (dishKey: string) => void;
 }) {
   const totalNutrition = meal.dishes.reduce(
     (acc: { calories: number; protein: number }, dish: Dish) => ({
@@ -1038,11 +1073,26 @@ function MealCard({
         </div>
         <div className="mt-3 space-y-3">
           {meal.dishes.map((dish: Dish, index: number) => (
-            <div key={`${dish.id}-${index}`} className="rounded-2xl border-2 border-[#3d2b1f] bg-white px-3 py-3 shadow-[3px_3px_0_0_rgba(243,192,122,0.28)]">
+            <div
+              key={`${dish.id}-${index}`}
+              className={cn(
+                "rounded-2xl border-2 px-3 py-3 shadow-[3px_3px_0_0_rgba(243,192,122,0.28)] transition-all",
+                checkedDishKeys?.has(getDishEntryKey?.(dish, index) ?? '')
+                  ? "border-[#d8cec3] bg-[#f3eee7] opacity-80"
+                  : "border-[#3d2b1f] bg-white"
+              )}
+            >
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="font-bold text-[#3d2b1f]">{dish.name}</div>
+                    <div
+                      className={cn(
+                        "font-bold text-[#3d2b1f]",
+                        checkedDishKeys?.has(getDishEntryKey?.(dish, index) ?? '') && "text-[#8e8276] line-through"
+                      )}
+                    >
+                      {dish.name}
+                    </div>
                     {dish.isUserInput && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-[#f2b48d] bg-[#fff1c9] px-2 py-1 text-[11px] font-semibold text-[#d46a4c]">
                         <Heart size={12} className="fill-current" />
@@ -1050,18 +1100,40 @@ function MealCard({
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-[#7f6b5d] mt-1">
+                  <div
+                    className={cn(
+                      "mt-1 text-xs text-[#7f6b5d]",
+                      checkedDishKeys?.has(getDishEntryKey?.(dish, index) ?? '') && "text-[#a79a8d]"
+                    )}
+                  >
                     食材：{dish.ingredients.slice(0, 5).map((ing: any) => ing.name).join('、')}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onOpenTutorial(dish)}
-                  className="inline-flex items-center gap-1 rounded-full border-2 border-[#3d2b1f] bg-[#fff1c9] px-2 py-1 text-xs font-semibold text-[#8c5a2b]"
-                >
-                  教程
-                  <BookOpen size={12} />
-                </button>
+                <div className="flex items-center gap-2">
+                  {getDishEntryKey && onToggleDish && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleDish(getDishEntryKey(dish, index))}
+                      className={cn(
+                        "inline-flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors",
+                        checkedDishKeys?.has(getDishEntryKey(dish, index))
+                          ? "border-[#b7b0a9] bg-[#d9d3cc] text-white"
+                          : "border-[#3d2b1f] bg-white text-[#6a5444]"
+                      )}
+                      aria-label={`标记${dish.name}`}
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onOpenTutorial(dish)}
+                    className="inline-flex items-center gap-1 rounded-full border-2 border-[#3d2b1f] bg-[#fff1c9] px-2 py-1 text-xs font-semibold text-[#8c5a2b]"
+                  >
+                    教程
+                    <BookOpen size={12} />
+                  </button>
+                </div>
               </div>
               {dish.tags && dish.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
@@ -1231,15 +1303,66 @@ function ShoppingView({ shoppingList, selectedItems, onToggleItem, onBack }: {
 function HistoryView({
   records,
   onBack,
+  onReplaceRecord,
   onDeleteRecord,
 }: {
   records: GenerationRecord[];
   onBack: () => void;
+  onReplaceRecord: (record: GenerationRecord) => void;
   onDeleteRecord: (recordId: string) => void;
 }) {
   const [selectedRecord, setSelectedRecord] = useState<GenerationRecord | null>(null);
   const [detailMode, setDetailMode] = useState<'menu' | 'shopping' | null>(null);
   const [selectedTutorialDish, setSelectedTutorialDish] = useState<Dish | null>(null);
+  const checkedDishKeys = new Set(selectedRecord?.completedMenuItemKeys ?? []);
+
+  useEffect(() => {
+    if (!selectedRecord) {
+      return;
+    }
+
+    const latestRecord = records.find((record) => record.id === selectedRecord.id);
+    if (latestRecord && latestRecord !== selectedRecord) {
+      setSelectedRecord(latestRecord);
+    }
+  }, [records, selectedRecord]);
+
+  const replaceSelectedRecord = (updater: (record: GenerationRecord) => GenerationRecord) => {
+    setSelectedRecord((prev) => {
+      if (!prev) {
+        return prev;
+      }
+
+      const updatedRecord = updater(prev);
+      onReplaceRecord(updatedRecord);
+      return updatedRecord;
+    });
+  };
+
+  const toggleHistoryDish = (dishKey: string) => {
+    replaceSelectedRecord((record) => {
+      const completedKeys = new Set(record.completedMenuItemKeys ?? []);
+      if (completedKeys.has(dishKey)) {
+        completedKeys.delete(dishKey);
+      } else {
+        completedKeys.add(dishKey);
+      }
+
+      return {
+        ...record,
+        completedMenuItemKeys: Array.from(completedKeys),
+      };
+    });
+  };
+
+  const toggleHistoryShoppingItem = (itemIndex: number) => {
+    replaceSelectedRecord((record) => ({
+      ...record,
+      shoppingList: record.shoppingList.map((item, index) =>
+        index === itemIndex ? { ...item, checked: !item.checked } : item
+      ),
+    }));
+  };
 
   return (
     <motion.div
@@ -1369,13 +1492,40 @@ function HistoryView({
                     {day.dayName}
                   </div>
                   {day.meals.breakfast && (
-                    <MealCard meal={day.meals.breakfast} label="早餐" onOpenTutorial={setSelectedTutorialDish} />
+                    <MealCard
+                      meal={day.meals.breakfast}
+                      label="早餐"
+                      onOpenTutorial={setSelectedTutorialDish}
+                      checkedDishKeys={checkedDishKeys}
+                      getDishEntryKey={(dish, dishIndex) =>
+                        `${selectedRecord.id}-${idx}-breakfast-${dish.id}-${dishIndex}`
+                      }
+                      onToggleDish={toggleHistoryDish}
+                    />
                   )}
                   {day.meals.lunch && (
-                    <MealCard meal={day.meals.lunch} label="午餐" onOpenTutorial={setSelectedTutorialDish} />
+                    <MealCard
+                      meal={day.meals.lunch}
+                      label="午餐"
+                      onOpenTutorial={setSelectedTutorialDish}
+                      checkedDishKeys={checkedDishKeys}
+                      getDishEntryKey={(dish, dishIndex) =>
+                        `${selectedRecord.id}-${idx}-lunch-${dish.id}-${dishIndex}`
+                      }
+                      onToggleDish={toggleHistoryDish}
+                    />
                   )}
                   {day.meals.dinner && (
-                    <MealCard meal={day.meals.dinner} label="晚餐" onOpenTutorial={setSelectedTutorialDish} />
+                    <MealCard
+                      meal={day.meals.dinner}
+                      label="晚餐"
+                      onOpenTutorial={setSelectedTutorialDish}
+                      checkedDishKeys={checkedDishKeys}
+                      getDishEntryKey={(dish, dishIndex) =>
+                        `${selectedRecord.id}-${idx}-dinner-${dish.id}-${dishIndex}`
+                      }
+                      onToggleDish={toggleHistoryDish}
+                    />
                   )}
                 </div>
               ))}
@@ -1410,13 +1560,13 @@ function HistoryView({
 
             <div className="grid gap-4 lg:grid-cols-2">
               {Object.entries(
-                selectedRecord.shoppingList.reduce((acc, item) => {
+                selectedRecord.shoppingList.reduce((acc, item, itemIndex) => {
                   if (!acc[item.category]) {
                     acc[item.category] = [];
                   }
-                  acc[item.category].push(item);
+                  acc[item.category].push({ item, itemIndex });
                   return acc;
-                }, {} as Record<string, ShoppingItem[]>)
+                }, {} as Record<string, { item: ShoppingItem; itemIndex: number }[]>)
               ).map(([category, items]) => (
                 <section
                   key={`${selectedRecord.id}-${category}`}
@@ -1429,25 +1579,51 @@ function HistoryView({
                     </span>
                   </div>
                   <div className="space-y-2">
-                    {items.map((item, idx) => (
-                      <div
+                    {items.map(({ item, itemIndex }, idx) => (
+                      <button
+                        type="button"
+                        onClick={() => toggleHistoryShoppingItem(itemIndex)}
                         key={`${selectedRecord.id}-${category}-${item.name}-${idx}`}
-                        className="rounded-2xl border border-[#efe5da] bg-white p-4"
+                        className={cn(
+                          "w-full rounded-2xl border p-4 text-left transition-all",
+                          item.checked
+                            ? "border-[#d8cec3] bg-[#f3eee7] opacity-80"
+                            : "border-[#efe5da] bg-white hover:border-[#f2b48d]"
+                        )}
                       >
                         <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <div className="font-medium text-[#3d2b1f]">{item.name}</div>
+                          <div className="flex min-w-0 flex-1 items-start gap-3">
+                            <div
+                              className={cn(
+                                "mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                                item.checked
+                                  ? "border-[#b7b0a9] bg-[#d9d3cc] text-white"
+                                  : "border-[#3d2b1f] bg-white text-[#6a5444]"
+                              )}
+                            >
+                              <Check className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div
+                                className={cn(
+                                  "font-medium text-[#3d2b1f]",
+                                  item.checked && "text-[#8e8276] line-through"
+                                )}
+                              >
+                                {item.name}
+                              </div>
                             {item.isSameDay && (
                               <span className="mt-2 inline-flex rounded-full bg-orange-100 px-2 py-1 text-xs text-orange-600">
                                 当天买
                               </span>
                             )}
                           </div>
+                          </div>
                           <span className="shrink-0 rounded-full bg-[#fff6eb] px-3 py-1 text-sm font-semibold text-[#8c6b54] whitespace-nowrap">
                             {item.quantity} {item.unit}
                           </span>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </section>
@@ -1489,11 +1665,20 @@ function HistoryView({
   );
 }
 
-function SettingsView({ config, onConfigChange, onBack }: {
+function SettingsView({ config, onConfigChange, onManualCheckUpdate, onBack }: {
   config: AppConfig;
   onConfigChange: (config: AppConfig) => void;
+  onManualCheckUpdate: () => Promise<
+    { status: 'available'; version: string } | { status: 'latest'; version: string } | { status: 'error' }
+  >;
   onBack: () => void;
 }) {
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateCheckMessage, setUpdateCheckMessage] = useState<string | null>(null);
+  const [isImportingBackup, setIsImportingBackup] = useState(false);
+  const [backupMessage, setBackupMessage] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+
   const handleProviderChange = (provider: Provider) => {
     const providerConfig = PROVIDERS[provider];
     onConfigChange({
@@ -1502,6 +1687,62 @@ function SettingsView({ config, onConfigChange, onBack }: {
       baseUrl: providerConfig.defaultBaseUrl,
       model: providerConfig.defaultModel,
     });
+  };
+
+  const handleCheckUpdate = async () => {
+    setIsCheckingUpdate(true);
+    setUpdateCheckMessage(null);
+
+    const result = await onManualCheckUpdate();
+
+    if (result.status === 'available') {
+      setUpdateCheckMessage(`发现新版本 v${result.version}，已为你打开更新提示。`);
+    } else if (result.status === 'latest') {
+      setUpdateCheckMessage(`当前已经是最新版本 v${result.version}。`);
+    } else {
+      setUpdateCheckMessage('检查更新失败，请稍后再试。');
+    }
+
+    setIsCheckingUpdate(false);
+  };
+
+  const handleExportBackup = () => {
+    try {
+      const fileName = downloadBackupSnapshot();
+      setBackupMessage(`备份已导出：${fileName}`);
+    } catch (error) {
+      console.error('导出备份失败:', error);
+      setBackupMessage('导出备份失败，请稍后再试。');
+    }
+  };
+
+  const handleImportBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    const confirmed = window.confirm('导入备份会覆盖当前设备上的本地数据，是否继续？');
+    if (!confirmed) {
+      return;
+    }
+
+    setIsImportingBackup(true);
+    setBackupMessage(null);
+
+    try {
+      const snapshot = await parseBackupFile(file);
+      restoreBackupSnapshot(snapshot);
+      setBackupMessage('备份导入成功，正在刷新应用...');
+      window.setTimeout(() => window.location.reload(), 700);
+    } catch (error) {
+      console.error('导入备份失败:', error);
+      setBackupMessage(error instanceof Error ? error.message : '导入备份失败，请检查文件后重试。');
+    } finally {
+      setIsImportingBackup(false);
+    }
   };
 
   return (
@@ -1621,6 +1862,93 @@ function SettingsView({ config, onConfigChange, onBack }: {
               <li>• <strong>Kimi</strong>: Moonshot OpenAI 兼容接口，默认适合文本与长上下文</li>
               <li>• <strong>Qwen</strong>: 默认使用 `qwen-plus`，如需图像识别可手动换成 VL 模型</li>
             </ul>
+          </div>
+
+          <div className="card bg-[#fffaf2] p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-[#3d2b1f]">版本更新</h3>
+                <p className="mt-1 text-sm text-[#7f6b5d]">当前版本 v{CURRENT_APP_VERSION}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleCheckUpdate()}
+                disabled={isCheckingUpdate}
+                className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-[#3d2b1f] bg-[#fff1c9] px-4 py-2 text-sm font-semibold text-[#8c5a2b] shadow-[3px_3px_0_0_rgba(243,192,122,0.3)] disabled:opacity-60"
+              >
+                {isCheckingUpdate ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    检查中...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    手动检查更新
+                  </>
+                )}
+              </button>
+            </div>
+            {updateCheckMessage && (
+              <div className="mt-3 rounded-2xl border border-[#eddac6] bg-white px-4 py-3 text-sm text-[#6f5646]">
+                {updateCheckMessage}
+              </div>
+            )}
+          </div>
+
+          <div className="card bg-[#fffaf2] p-5">
+            <div className="flex flex-col gap-4">
+              <div>
+                <h3 className="text-base font-semibold text-[#3d2b1f]">数据备份与恢复</h3>
+                <p className="mt-1 text-sm leading-6 text-[#7f6b5d]">
+                    导出当前设备上的菜谱库、历史记录和偏好设置；不会包含 API Key 或相关配置。导入后会覆盖本地数据。
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={handleExportBackup}
+                  className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-[#3d2b1f] bg-white px-4 py-2 text-sm font-semibold text-[#6a5444]"
+                >
+                  <Download className="h-4 w-4" />
+                  导出备份
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => importInputRef.current?.click()}
+                  disabled={isImportingBackup}
+                  className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-[#3d2b1f] bg-[#fff1c9] px-4 py-2 text-sm font-semibold text-[#8c5a2b] shadow-[3px_3px_0_0_rgba(243,192,122,0.3)] disabled:opacity-60"
+                >
+                  {isImportingBackup ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      导入中...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      导入备份
+                    </>
+                  )}
+                </button>
+
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(event) => void handleImportBackup(event)}
+                />
+              </div>
+
+              {backupMessage && (
+                <div className="rounded-2xl border border-[#eddac6] bg-white px-4 py-3 text-sm text-[#6f5646]">
+                  {backupMessage}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="text-sm text-gray-500">
