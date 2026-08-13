@@ -1,12 +1,13 @@
 {
-  "version": "1.0.2",
-  "title": "WeekEat v1.0.2",
-  "publishedAt": "2026-07-26",
-  "releaseUrl": "https://github.com/shiliuww/WeekEat/releases/tag/v1.0.2",
+  "version": "1.1.0",
+  "title": "WeekEat v1.1.0",
+  "publishedAt": "2026-08-13",
+  "releaseUrl": "https://github.com/shiliuww/WeekEat/releases/tag/v1.1.0",
   "releaseNotes": [
-    "修复保存图片时无法稳定调起系统分享或保存到相册的问题。",
-    "一周菜谱中的教程弹窗新增食材与分量展示，查看做法更完整。",
-    "移除采购清单页中多余的横屏说明文案。"
+    "新增 66 道更完整的家常基础菜谱，补充鸭肉、羊肉、湘味和蒸菜等常见选择。",
+    "新增历史记录勾选完成效果，可在历史菜谱和采购清单中标记已做或已买。",
+    "更新检查改为读取 GitHub Release，并在设置页支持手动检查更新。",
+    "新增本地数据备份与恢复功能，且备份文件不包含 API Key 或相关配置。"
   ],
   "forceUpdate": false
 }
