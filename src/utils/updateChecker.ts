@@ -6,6 +6,7 @@ const DEFAULT_RELEASE_URL = 'https://github.com/shiliuww/WeekEat/releases/latest
 const UPDATE_DISMISS_KEY = 'weekeat_update_dismissed_version';
 
 export const CURRENT_APP_VERSION = __APP_VERSION__;
+export const UPDATE_CHECK_ENABLED = true;
 
 export type UpdateManifest = {
   version: string;

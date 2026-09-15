@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-import { Plus, ShoppingCart, Calendar, ChevronLeft, Upload, Check, ChefHat, Trash2, Settings, MessageSquare, Sparkles, RefreshCw, Bot, EyeOff, BookOpen, ThumbsUp, Download, X, Heart, History } from 'lucide-react';
+import { Plus, ShoppingCart, Calendar, ChevronLeft, Upload, Check, Trash2, Settings, MessageSquare, Sparkles, RefreshCw, Bot, EyeOff, BookOpen, ThumbsUp, Download, X, Heart, History } from 'lucide-react';
 import { Dish, DailyMenu, ShoppingItem, GenerationRecord } from './types';
 import { generateWeeklyMenu, generateShoppingList, analyzeImage } from './utils/recipeGenerator';
-import { initDatabase, getDishes, boostRecommendationScore, upsertDish, applyDietPreferenceProfile } from './utils/database';
+import { initDatabase, getDishes, upsertDish, applyDietPreferenceProfile, adjustRecommendationScoresByName } from './utils/database';
 import { aiService } from './utils/aiService';
 import { RecipeLibrary } from './components/RecipeLibrary';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,7 +11,7 @@ import { twMerge } from 'tailwind-merge';
 import { loadConfig, saveConfig, validateConfig, AppConfig, PROVIDERS, Provider, supportsVision } from './utils/config';
 import { loadJson, saveJson } from './utils/storage';
 import { toPng } from 'html-to-image';
-import { checkForAppUpdate, CURRENT_APP_VERSION, dismissUpdateReminder, openUpdateLink } from './utils/updateChecker';
+import { checkForAppUpdate, CURRENT_APP_VERSION, dismissUpdateReminder, openUpdateLink, UPDATE_CHECK_ENABLED } from './utils/updateChecker';
 import type { AvailableUpdate } from './utils/updateChecker';
 import { downloadBackupSnapshot, parseBackupFile, restoreBackupSnapshot } from './utils/backup';
 
@@ -161,8 +161,8 @@ async function saveElementAsImage(
   };
   const shareSupportsFiles =
     imageFile !== null &&
-    (typeof shareNavigator.canShare !== 'function' ||
-      shareNavigator.canShare({ files: [imageFile] }));
+    typeof shareNavigator.canShare === 'function' &&
+    shareNavigator.canShare({ files: [imageFile] });
 
   if (navigator.share && shareSupportsFiles && imageFile) {
     try {
@@ -180,14 +180,12 @@ async function saveElementAsImage(
     }
   }
 
-  const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = objectUrl;
+  link.href = dataUrl;
   link.download = fileName;
   document.body.appendChild(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 }
 
 function buildGenerationRecord(
@@ -236,7 +234,9 @@ function App() {
 
   useEffect(() => {
     initDatabase();
-    void checkForAppUpdate().then(setAvailableUpdate);
+    if (UPDATE_CHECK_ENABLED) {
+      void checkForAppUpdate().then(setAvailableUpdate);
+    }
   }, []);
 
   useEffect(() => {
@@ -296,17 +296,26 @@ function App() {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    for (const file of files) {
-      setIsAnalyzing(true);
+    e.target.value = '';
+    if (files.length === 0) return;
+
+    setIsAnalyzing(true);
+    try {
+      for (const file of files) {
       try {
         const dish = await analyzeImage(file);
-        setUserDishes(prev => [...prev, dish]);
+        setUserDishes(prev =>
+          prev.some(existing => existing.id === dish.id || existing.name === dish.name)
+            ? prev
+            : [...prev, dish]
+        );
       } catch (error) {
         console.error('分析失败:', error);
         alert(error instanceof Error ? error.message : '分析失败');
-      } finally {
-        setIsAnalyzing(false);
       }
+      }
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -382,7 +391,7 @@ function App() {
               config={config}
             />
           )}
-          
+
           {view === 'upload' && (
             <UploadView
               key="upload"
@@ -438,6 +447,7 @@ function App() {
                 saveConfig(newConfig);
               }}
               onManualCheckUpdate={handleManualCheckUpdate}
+              showUpdateControls={UPDATE_CHECK_ENABLED}
               onBack={() => setView('home')}
             />
           )}
@@ -503,9 +513,10 @@ function UpdatePrompt({
   onUpdateNow: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-5 sm:px-6">
-      <div className="w-[min(30rem,calc(100vw-2rem))] rounded-[28px] border-2 border-[#3d2b1f] bg-[#fffaf2] p-5 shadow-[8px_8px_0_0_rgba(243,192,122,0.35)] sm:w-[min(34rem,calc(100vw-3rem))]">
-        <div className="mb-4 flex items-start justify-between gap-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/35 px-4 py-4 sm:px-6 sm:py-6">
+      <div className="mx-auto flex min-h-full w-full items-center justify-center">
+        <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-[28px] border-2 border-[#3d2b1f] bg-[#fffaf2] shadow-[8px_8px_0_0_rgba(243,192,122,0.35)] max-h-[min(88vh,42rem)]">
+        <div className="flex items-start justify-between gap-4 border-b border-[#eddac6] px-5 py-5">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d46a4c]">发现新版本</div>
             <h3 className="mt-1 text-xl font-black text-[#3d2b1f]">
@@ -528,27 +539,29 @@ function UpdatePrompt({
           )}
         </div>
 
-        <div className="rounded-2xl border border-[#eddac6] bg-white px-4 py-4">
-          <div className="text-sm font-semibold text-[#8c5a2b]">更新内容</div>
-          {update.releaseNotes.length > 0 ? (
-            <div className="mt-3 space-y-2">
-              {update.releaseNotes.map((note, index) => (
-                <div
-                  key={`${update.version}-note-${index}`}
-                  className="rounded-2xl border border-[#f5e4cf] bg-[#fffaf5] px-3 py-2 text-sm leading-6 text-[#5f4a3a]"
-                >
-                  {note}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-2 text-sm leading-6 text-[#7f6b5d]">
-              已发布新版本，建议前往下载最新版安装包。
-            </p>
-          )}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="rounded-2xl border border-[#eddac6] bg-white px-4 py-4">
+            <div className="text-sm font-semibold text-[#8c5a2b]">更新内容</div>
+            {update.releaseNotes.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {update.releaseNotes.map((note, index) => (
+                  <div
+                    key={`${update.version}-note-${index}`}
+                    className="rounded-2xl border border-[#f5e4cf] bg-[#fffaf5] px-3 py-2 text-sm leading-6 text-[#5f4a3a] break-words"
+                  >
+                    {note}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-[#7f6b5d]">
+                已发布新版本，建议前往下载最新版安装包。
+              </p>
+            )}
+          </div>
         </div>
 
-        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-3 border-t border-[#eddac6] bg-[#fffaf2] px-5 py-4 sm:flex-row sm:justify-end">
           {!update.forceUpdate && (
             <button
               type="button"
@@ -566,6 +579,7 @@ function UpdatePrompt({
             <Download className="h-4 w-4" />
             去下载更新
           </button>
+        </div>
         </div>
       </div>
     </div>
@@ -640,10 +654,14 @@ function HomeView({ onStart, onSettings, onChat, onLibrary, onHistory, hasConfig
       <div className="w-full lg:grid lg:max-w-5xl lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:gap-10">
         <div className="text-center mb-12 lg:mb-0 lg:text-left">
           <div className="w-32 h-32 bg-[#ffd36e] rounded-[38px] border-4 border-[#3d2b1f] flex items-center justify-center mb-6 shadow-[8px_8px_0_0_rgba(243,192,122,0.35)] mx-auto rotate-[-4deg] lg:mx-0">
-            <ChefHat className="w-16 h-16 text-white" />
+            <img
+              src="/favicon.png"
+              alt="WeekEat 应用图标"
+              className="h-24 w-24 rounded-[28px] object-cover"
+            />
           </div>
           <h1 className="text-4xl font-black text-[#3d2b1f] mb-2 lg:text-5xl">
-            智能菜谱助手
+            WeekEat：智能菜谱助手
           </h1>
           <p className="text-[#8c6b54] text-lg font-semibold">
             一周菜谱 · 智能采买
@@ -727,7 +745,7 @@ function UploadView({
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="min-h-screen bg-[linear-gradient(180deg,#fff7eb_0%,#fffdf8_50%,#ffeede_100%)] p-6 pb-48 lg:min-h-[calc(100vh-3rem)] lg:pb-8"
+      className="min-h-screen bg-[linear-gradient(180deg,#fff7eb_0%,#fffdf8_50%,#ffeede_100%)] px-6 pt-6 pb-48 lg:min-h-[calc(100vh-3rem)] lg:pb-8"
     >
       <div className="mx-auto max-w-6xl">
         <div className="flex items-center mb-8">
@@ -740,14 +758,37 @@ function UploadView({
           写下这周特别想吃、想试的几样就可以，不需要把整周内容全部自己想出来，剩下的搭配和补全会由系统自动完成。
         </div>
 
-      {!hasConfig && (
-        <div className="bg-[#fff1c9] border-2 border-[#3d2b1f] rounded-2xl p-4 mb-6">
-          <p className="text-amber-700 text-sm flex items-start gap-2">
-            <Sparkles className="w-5 h-5 flex-shrink-0" />
-            配置API密钥后可启用AI图像识别和智能菜谱生成
-          </p>
-        </div>
-      )}
+        {isGenerating && (
+          <div className="mb-6 rounded-[28px] border-2 border-[#3d2b1f] bg-[#fff1c9] p-5 shadow-[6px_6px_0_0_rgba(243,192,122,0.25)]">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-[#3d2b1f] bg-white">
+                <RefreshCw className="h-5 w-5 animate-spin text-[#d46a4c]" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold uppercase tracking-[0.22em] text-[#d46a4c]">
+                  WeekEat 正在生成
+                </div>
+                <div className="mt-1 text-lg font-black text-[#3d2b1f]">
+                  正在为你安排这一周怎么吃
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2 text-sm text-[#6f5646] sm:grid-cols-3">
+              <div className="rounded-2xl border border-[#efcfaa] bg-white px-4 py-3">1. 整理这周偏好</div>
+              <div className="rounded-2xl border border-[#efcfaa] bg-white px-4 py-3">2. 搭配每日三餐</div>
+              <div className="rounded-2xl border border-[#efcfaa] bg-white px-4 py-3">3. 同步生成采购清单</div>
+            </div>
+          </div>
+        )}
+
+        {!hasConfig && (
+          <div className="bg-[#fff1c9] border-2 border-[#3d2b1f] rounded-2xl p-4 mb-6">
+            <p className="text-amber-700 text-sm flex items-start gap-2">
+              <Sparkles className="w-5 h-5 flex-shrink-0" />
+              配置API密钥后可启用AI图像识别和智能菜谱生成
+            </p>
+          </div>
+        )}
 
         <div className="lg:grid lg:grid-cols-[1.05fr_0.95fr] lg:gap-6 lg:items-start">
         <div className="mb-8 lg:mb-0">
@@ -758,15 +799,19 @@ function UploadView({
         {!canUseVision && hasConfig ? (
           <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center">
             <EyeOff className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 font-medium">{PROVIDERS[config.provider].name} 暂不支持图像识别</p>
-            <p className="text-gray-400 text-sm mt-1">您仍可继续使用其他AI功能</p>
+            <p className="text-gray-500 font-medium">当前模型不支持图像识别</p>
+            <p className="text-gray-400 text-sm mt-1">
+              {config.provider === 'deepseek'
+                ? 'DeepSeek 请使用 deepseek-v4-flash-vision-exp 模型。'
+                : '请切换到支持视觉输入的模型后再上传图片。'}
+            </p>
           </div>
         ) : (
           <label className="block cursor-pointer">
             <div className="border-2 border-dashed border-[#3d2b1f] bg-[#fff8ef] rounded-[28px] p-8 text-center transition-all shadow-[5px_5px_0_0_rgba(243,192,122,0.25)]">
               <Upload className="w-12 h-12 text-[#d46a4c] mx-auto mb-2" />
               <p className="text-[#b85c3d] font-semibold">点击上传图片</p>
-              <p className="text-[#8c6b54] text-sm mt-1">支持多张图片</p>
+              <p className="text-[#8c6b54] text-sm mt-1">支持单张或多张图片；识别出的新菜会自动补入菜谱库并纳入本周菜单</p>
             </div>
             <input
               type="file"
@@ -781,7 +826,7 @@ function UploadView({
         {isAnalyzing && (
           <div className="mt-4 text-center text-primary-600 flex items-center justify-center gap-2">
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary-600 border-t-transparent" />
-            AI正在分析图片...
+            AI正在识别图片并同步菜谱库...
           </div>
         )}
         
@@ -912,7 +957,7 @@ function MenuView({ weeklyMenu, onShopping, onBack, onRegenerate, isGenerating }
     try {
       await saveElementAsImage(
         captureRef.current,
-        `weekeat-menu-${new Date().toISOString().slice(0, 10)}.png`,
+        'weekeat-menu.png',
         '本周菜谱',
         'WeekEat 本周菜谱'
       );
@@ -931,10 +976,10 @@ function MenuView({ weeklyMenu, onShopping, onBack, onRegenerate, isGenerating }
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="min-h-screen pb-32 lg:min-h-[calc(100vh-3rem)] lg:pb-8"
+      className="min-h-screen bg-[linear-gradient(180deg,#fff8ef_0%,#fffdf8_100%)] px-6 pt-6 pb-32 lg:min-h-[calc(100vh-3rem)] lg:pb-8"
     >
-      <div className="sticky top-0 bg-[#fffdf8] z-10 p-6 border-b-2 border-[#3d2b1f]">
-        <div className="mx-auto max-w-6xl flex items-center justify-between mb-4">
+      <div className="sticky top-0 z-10 mx-auto mb-5 max-w-6xl rounded-[28px] border-2 border-[#3d2b1f] bg-[#fffdf8]/95 p-5 shadow-[6px_6px_0_0_rgba(243,192,122,0.2)] backdrop-blur">
+        <div className="flex items-center justify-between mb-4">
           <button onClick={onBack} className="p-2 -ml-2">
             <ChevronLeft className="w-6 h-6 text-gray-600" />
           </button>
@@ -947,7 +992,10 @@ function MenuView({ weeklyMenu, onShopping, onBack, onRegenerate, isGenerating }
             <RefreshCw className={cn("w-6 h-6", isGenerating && "animate-spin")} />
           </button>
         </div>
-        <div className="mx-auto flex max-w-6xl justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm text-[#7f6b5d]">
+            已为你整理好一周菜单，也可以继续重生成新方案。
+          </div>
           <button
             onClick={handleSaveImage}
             disabled={isSavingImage}
@@ -963,7 +1011,7 @@ function MenuView({ weeklyMenu, onShopping, onBack, onRegenerate, isGenerating }
         </div>
       </div>
 
-      <div ref={captureRef} className="mx-auto max-w-6xl px-6 pb-2">
+      <div ref={captureRef} className="mx-auto max-w-6xl pb-2">
         <div className="mb-4 rounded-[28px] border-2 border-[#3d2b1f] bg-[#fff8ef] p-5 shadow-[6px_6px_0_0_rgba(243,192,122,0.28)]">
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#d46a4c]">WeekEat</div>
           <div className="mt-2 text-3xl font-black text-[#3d2b1f]">本周菜谱</div>
@@ -1181,7 +1229,7 @@ function ShoppingView({ shoppingList, selectedItems, onToggleItem, onBack }: {
     try {
       await saveElementAsImage(
         captureRef.current,
-        `weekeat-shopping-list-${new Date().toISOString().slice(0, 10)}.png`,
+        'weekeat-shopping-list.png',
         '采购清单',
         'WeekEat 采购清单'
       );
@@ -1665,12 +1713,13 @@ function HistoryView({
   );
 }
 
-function SettingsView({ config, onConfigChange, onManualCheckUpdate, onBack }: {
+function SettingsView({ config, onConfigChange, onManualCheckUpdate, showUpdateControls, onBack }: {
   config: AppConfig;
   onConfigChange: (config: AppConfig) => void;
   onManualCheckUpdate: () => Promise<
     { status: 'available'; version: string } | { status: 'latest'; version: string } | { status: 'error' }
   >;
+  showUpdateControls: boolean;
   onBack: () => void;
 }) {
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
@@ -1864,6 +1913,7 @@ function SettingsView({ config, onConfigChange, onManualCheckUpdate, onBack }: {
             </ul>
           </div>
 
+          {showUpdateControls && (
           <div className="card bg-[#fffaf2] p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -1895,6 +1945,7 @@ function SettingsView({ config, onConfigChange, onManualCheckUpdate, onBack }: {
               </div>
             )}
           </div>
+          )}
 
           <div className="card bg-[#fffaf2] p-5">
             <div className="flex flex-col gap-4">
@@ -1975,6 +2026,7 @@ function ChatView({
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const quickPrompts = ['我想养胃，最近晚饭怎么安排？', '帮我推荐几道减脂但不寡淡的菜', '我这周想多吃蒸菜和汤，可以怎么搭？'];
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1982,7 +2034,7 @@ function ChatView({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isTyping]);
 
   const sendMessage = async () => {
     if (!input.trim() || !hasConfig) return;
@@ -1993,72 +2045,31 @@ function ChatView({
     setIsTyping(true);
 
     try {
-      const isDietRequest = ['养胃', '养脾胃', '减脂', '减肥', '增肌', '健康', '养生', '营养', '饮食', '吃什么', '口味', '偏好', '喜欢', '想吃', '不想吃', '清淡', '蒸菜', '汤'].some(
-        keyword => userMessage.content.includes(keyword)
-      );
+      const libraryBeforeChanges = getDishes();
+      const plan = await aiService.planConversationLibraryChanges(userMessage.content, libraryBeforeChanges);
 
-      if (isDietRequest) {
-        const analysis = await aiService.analyzeDietNeeds(userMessage.content);
-        
-        const suggestionContent = 
-`${analysis.suggestions}
+      applyDietPreferenceProfile(plan.preference);
+      const adjustedNames = adjustRecommendationScoresByName(plan.scoreAdjustments);
+      const addedNames: string[] = [];
 
-💡 **推荐食材：**
-${analysis.recommendedIngredients.map(i => `• ${i}`).join('\n')}
-
-🍳 **推荐菜谱：**
-${analysis.recommendedDishes.map(d => `• ${d}`).join('\n')}
-
-⚠️ **应避免食材：**
-${analysis.avoidIngredients.map(i => `• ${i}`).join('\n')}
-
-🧭 **整体偏好判断：**
-${analysis.preferenceSummary || '本次更偏单次建议，没有额外整体偏好摘要。'}
-
-🏷️ **偏好标签：**
-${analysis.likedTags.map(tag => `• ${tag}`).join('\n') || '• 暂无'}
-
-🚫 **回避标签：**
-${analysis.dislikedTags.map(tag => `• ${tag}`).join('\n') || '• 暂无'}`;
-
-        onMessagesChange(prev => [...prev, { role: 'assistant', content: suggestionContent }]);
-
-        applyDietPreferenceProfile({
-          recommendedIngredients: analysis.recommendedIngredients,
-          recommendedDishes: analysis.recommendedDishes,
-          avoidIngredients: analysis.avoidIngredients,
-          likedTags: analysis.likedTags,
-          dislikedTags: analysis.dislikedTags,
-          healthGoals: analysis.healthGoals,
-          preferenceSummary: analysis.preferenceSummary,
-          shouldRebalanceAllScores: analysis.shouldRebalanceAllScores,
-        });
-
-        const dishesToBoost: string[] = [];
-        
-        for (const dishName of analysis.recommendedDishes) {
-          const existing = getDishes().find(d => d.name.includes(dishName) || dishName.includes(d.name));
-          if (existing) {
-            dishesToBoost.push(existing.id);
-          } else {
-            try {
-              const newDish = await aiService.generateDishFromName(dishName);
-              const persistedDish = upsertDish({
-                ...newDish,
-                addedFrom: 'ai',
-              });
-              dishesToBoost.push(persistedDish.id);
-            } catch {}
-          }
+      for (const dishName of plan.addDishNames) {
+        if (getDishes().some(dish => dish.name === dishName)) continue;
+        try {
+          const newDish = await aiService.generateDishFromName(dishName);
+          upsertDish({ ...newDish, addedFrom: 'ai' });
+          addedNames.push(dishName);
+        } catch {
+          // 单道菜生成失败不影响已经完成的偏好与喜爱度更新。
         }
-        
-        if (dishesToBoost.length > 0) {
-          boostRecommendationScore(dishesToBoost, 18);
-        }
-      } else {
-        const response = await aiService.chat(userMessage.content, messages);
-        onMessagesChange(prev => [...prev, { role: 'assistant', content: response }]);
       }
+
+      const appliedChanges = [
+        addedNames.length ? `已加入菜谱库：${addedNames.join('、')}` : '',
+        adjustedNames.length ? `已调整喜爱度：${adjustedNames.join('、')}` : '',
+        plan.preference.preferenceSummary ? '已更新长期口味偏好' : '',
+      ].filter(Boolean);
+      const response = [plan.reply, appliedChanges.length ? `\n\n✅ ${appliedChanges.join('；')}` : ''].join('');
+      onMessagesChange(prev => [...prev, { role: 'assistant', content: response }]);
     } catch (error) {
       onMessagesChange(prev => [...prev, {
         role: 'assistant', 
@@ -2073,108 +2084,137 @@ ${analysis.dislikedTags.map(tag => `• ${tag}`).join('\n') || '• 暂无'}`;
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="min-h-screen flex flex-col"
+      className="min-h-screen bg-[linear-gradient(180deg,#fff7eb_0%,#fffdf8_48%,#ffe9d4_100%)] px-6 pt-6 pb-6 lg:min-h-[calc(100vh-3rem)]"
     >
-      <div className="sticky top-0 bg-white z-10 p-6 border-b border-gray-100">
-        <div className="flex items-center">
-          <button onClick={onBack} className="p-2 -ml-2">
-            <ChevronLeft className="w-6 h-6 text-gray-600" />
-          </button>
-          <div className="flex items-center gap-3 ml-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-emerald-500 rounded-full flex items-center justify-center">
-              <Bot className="w-5 h-5 text-white" />
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5">
+        <div className="sticky top-0 z-10 rounded-[28px] border-2 border-[#3d2b1f] bg-[#fffaf2]/95 p-5 shadow-[6px_6px_0_0_rgba(243,192,122,0.2)] backdrop-blur">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center">
+              <button onClick={onBack} className="p-2 -ml-2">
+                <ChevronLeft className="w-6 h-6 text-gray-600" />
+              </button>
+              <div className="flex items-center gap-3 ml-2">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border-2 border-[#3d2b1f] bg-[#ffe1d2] shadow-[3px_3px_0_0_rgba(243,192,122,0.28)]">
+                  <Bot className="w-5 h-5 text-[#b85c3d]" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-black text-[#3d2b1f]">AI 助手</h1>
+                  <p className="text-xs text-[#8c6b54]">
+                    {isTyping ? '正在思考你的问题...' : hasConfig ? '在线，随时可以一起聊吃什么' : '请先配置 API'}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-800">AI 助手</h1>
-              <p className="text-xs text-gray-500">{hasConfig ? '在线' : '请配置API'}</p>
+            <div className={cn(
+              "rounded-full border px-3 py-1 text-xs font-semibold",
+              hasConfig
+                ? "border-[#f2b48d] bg-[#fff1c9] text-[#8c5a2b]"
+                : "border-[#e3d6c8] bg-white text-[#8c6b54]"
+            )}>
+              {isTyping ? '思考中' : hasConfig ? '已连接' : '未配置'}
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
-          <div className="text-center py-12 text-gray-400">
-            <Bot className="w-16 h-16 mx-auto mb-4 text-primary-300" />
-            <p>你好！我是你的AI营养师和厨师助手</p>
-            <p className="text-sm mt-2">有什么问题都可以问我~</p>
-            <div className="flex flex-col gap-2 mt-6">
-              <p className="text-sm text-gray-500">试试问：</p>
-              <span className="bg-gray-100 px-3 py-2 rounded-full text-sm inline-block">"我想养胃，应该吃什么？"</span>
-              <span className="bg-gray-100 px-3 py-2 rounded-full text-sm inline-block">"推荐一些减脂餐"</span>
-            </div>
-          </div>
-        )}
-
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={cn(
-              "flex gap-3 max-w-[85%]",
-              msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
-            )}
-          >
-            <div className={cn(
-              "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
-              msg.role === 'user'
-                ? "bg-gray-200"
-                : "bg-gradient-to-br from-primary-400 to-emerald-500"
-            )}>
-              {msg.role === 'user' ? '👤' : <Bot className="w-4 h-4 text-white" />}
-            </div>
-            <div className={cn(
-              "p-4 rounded-2xl whitespace-pre-wrap",
-              msg.role === 'user'
-                ? "bg-primary-500 text-white"
-                : "bg-gray-100 text-gray-800"
-            )}>
-              {msg.content}
-            </div>
-          </div>
-        ))}
-
-        {isTyping && (
-          <div className="flex gap-3 max-w-[85%] mr-auto">
-            <div className="w-8 h-8 bg-gradient-to-br from-primary-400 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
-              <Bot className="w-4 h-4 text-white" />
-            </div>
-            <div className="bg-gray-100 text-gray-800 p-4 rounded-2xl">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+        <div className="flex-1 overflow-y-auto rounded-[32px] border-2 border-[#3d2b1f] bg-[#fffaf2] p-4 shadow-[8px_8px_0_0_rgba(243,192,122,0.2)] sm:p-5">
+          {messages.length === 0 && (
+            <div className="rounded-[28px] border-2 border-dashed border-[#d8c1a7] bg-[#fff8ef] px-6 py-12 text-center text-[#8c6b54]">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[22px] border-2 border-[#3d2b1f] bg-[#ffe1d2] shadow-[4px_4px_0_0_rgba(243,192,122,0.25)]">
+                <Bot className="h-8 w-8 text-[#b85c3d]" />
+              </div>
+              <p className="text-xl font-black text-[#3d2b1f]">你好，我是你的吃饭搭子</p>
+              <p className="mt-2 text-sm leading-6">无论是养胃、减脂、清淡一点，还是单纯想吃点顺口的，都可以直接问我。</p>
+              <div className="mt-6">
+                <p className="text-sm font-semibold text-[#d46a4c]">试试这些问题</p>
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  {quickPrompts.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => setInput(prompt)}
+                      className="rounded-full border-2 border-[#3d2b1f] bg-white px-4 py-2 text-sm font-medium text-[#6f5646] shadow-[3px_3px_0_0_rgba(243,192,122,0.18)]"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div ref={messagesEndRef} />
-      </div>
+          <div className="space-y-4">
+            {messages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={cn(
+                  "flex gap-3 max-w-[85%]",
+                  msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
+                )}
+              >
+                <div className={cn(
+                  "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl border-2 border-[#3d2b1f]",
+                  msg.role === 'user'
+                    ? "bg-[#fff1c9] text-[#8c5a2b]"
+                    : "bg-[#ffe1d2] text-[#b85c3d]"
+                )}>
+                  {msg.role === 'user' ? '我' : <Bot className="w-4 h-4" />}
+                </div>
+                <div className={cn(
+                  "rounded-[24px] border-2 p-4 whitespace-pre-wrap shadow-[4px_4px_0_0_rgba(243,192,122,0.16)]",
+                  msg.role === 'user'
+                    ? "border-[#3d2b1f] bg-[#ffe8c7] text-[#3d2b1f]"
+                    : "border-[#efd9bf] bg-white text-[#4f3c30]"
+                )}>
+                  {msg.content}
+                </div>
+              </div>
+            ))}
 
-      <div className="p-4 border-t border-gray-100 bg-white">
-        {!hasConfig ? (
-          <div className="text-center py-4 text-gray-500">
-            请先在设置中配置API密钥
+            {isTyping && (
+              <div className="flex gap-3 max-w-[85%] mr-auto">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl border-2 border-[#3d2b1f] bg-[#ffe1d2] text-[#b85c3d]">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <div className="rounded-[24px] border-2 border-[#efd9bf] bg-white p-4 text-[#4f3c30] shadow-[4px_4px_0_0_rgba(243,192,122,0.16)]">
+                  <div className="text-sm font-medium text-[#8c6b54]">正在思考中...</div>
+                  <div className="mt-2 flex gap-1">
+                    <div className="w-2 h-2 bg-[#d6a06a] rounded-full animate-bounce" />
+                    <div className="w-2 h-2 bg-[#d6a06a] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    <div className="w-2 h-2 bg-[#d6a06a] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
           </div>
-        ) : (
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder="输入你的问题..."
-              className="input-field flex-1"
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!input.trim() || isTyping}
-              className="btn-primary px-6 disabled:opacity-50"
-            >
-              发送
-            </button>
-          </div>
-        )}
+        </div>
+
+        <div className="rounded-[28px] border-2 border-[#3d2b1f] bg-[#fff8ef] p-4 shadow-[6px_6px_0_0_rgba(243,192,122,0.18)]">
+          {!hasConfig ? (
+            <div className="text-center py-4 text-[#8c6b54]">
+              请先在设置中配置API密钥
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                placeholder="输入你的问题..."
+                className="input-field flex-1"
+              />
+              <button
+                onClick={sendMessage}
+                disabled={!input.trim() || isTyping}
+                className="btn-primary px-6 disabled:opacity-50 sm:self-end"
+              >
+                {isTyping ? '思考中...' : '发送'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </motion.div>
   );

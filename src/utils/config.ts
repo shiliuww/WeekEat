@@ -26,10 +26,10 @@ export const PROVIDERS: Record<Provider, {
   },
   deepseek: {
     name: 'DeepSeek',
-    defaultBaseUrl: 'https://api.deepseek.com/v1',
-    defaultModel: 'deepseek-chat',
+    defaultBaseUrl: 'https://api.deepseek.com',
+    defaultModel: 'deepseek-v4-flash-vision-exp',
     supportsVision: false,
-    description: '性价比高，不支持图像识别',
+    description: '支持图像识别（需使用视觉模型）',
   },
   glm: {
     name: '智谱 AI (GLM)',
@@ -71,6 +71,19 @@ export const loadConfig = (): AppConfig => {
       if (!parsed.provider) {
         return { ...defaultConfig, ...parsed, provider: 'openai' };
       }
+      // 仅迁移历史默认值；用户手动填写的其他 DeepSeek 模型保持不变。
+      if (
+        parsed.provider === 'deepseek' &&
+        parsed.model === 'deepseek-chat' &&
+        (!parsed.baseUrl || parsed.baseUrl === 'https://api.deepseek.com/v1')
+      ) {
+        return {
+          ...defaultConfig,
+          ...parsed,
+          baseUrl: PROVIDERS.deepseek.defaultBaseUrl,
+          model: PROVIDERS.deepseek.defaultModel,
+        };
+      }
       return { ...defaultConfig, ...parsed };
     }
   } catch (e) {
@@ -98,6 +111,10 @@ export const supportsVision = (config: AppConfig): boolean => {
   if (config.provider === 'qwen') {
     const model = config.model.toLowerCase();
     return model.includes('vl') || model.includes('omni') || model.includes('qvq');
+  }
+
+  if (config.provider === 'deepseek') {
+    return config.model.toLowerCase().includes('vision');
   }
 
   return false;

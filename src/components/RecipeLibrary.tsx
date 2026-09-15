@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dish, Ingredient } from '../types';
-import { getDishes, deleteDish, updateDish, addDish } from '../utils/database';
+import { getDishes, deleteDish, updateDish, addDish, upsertDish, applyDietPreferenceProfile, adjustRecommendationScoresByName } from '../utils/database';
 import {
   Plus,
   Edit2,
@@ -66,7 +66,7 @@ export const RecipeLibrary: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: '你好，我可以帮你一起看菜谱库该怎么改。你可以直接说想优化哪道菜、想补什么食材结构，或者想统一调整哪些标签。',
+      content: '你好，我可以直接联动本地菜谱库：比如“加入宫保鸡丁”、“我不爱香菜”、“把番茄炒蛋喜爱度调高”。我会先说明并执行对应动作。',
     },
   ]);
   const [isChatting, setIsChatting] = useState(false);
@@ -351,16 +351,32 @@ export const RecipeLibrary: React.FC = () => {
     setIsChatting(true);
 
     try {
-      const context = [
-        '你正在协助用户优化本地菜谱库。',
-        `当前菜谱总数：${dishes.length}。`,
-        `现有标签：${allTags.slice(0, 20).join('、') || '暂无'}。`,
-        `当前搜索结果中的示例菜谱：${filteredDishes.slice(0, 10).map(dish => dish.name).join('、') || '暂无'}。`,
-        '请围绕菜谱结构、食材、教程、标签、分类、营养信息给出简洁可执行建议；如果用户要求修改方案，优先给出具体改法。',
-      ].join('\n');
+      const plan = await aiService.planConversationLibraryChanges(input, dishes);
+      applyDietPreferenceProfile(plan.preference);
+      const adjustedNames = adjustRecommendationScoresByName(plan.scoreAdjustments);
+      const addedNames: string[] = [];
 
-      const response = await aiService.chat(`${context}\n\n用户问题：${input}`, chatMessages);
-      setChatMessages(prev => [...prev, { role: 'assistant', content: response }]);
+      for (const dishName of plan.addDishNames) {
+        if (getDishes().some(dish => dish.name === dishName)) continue;
+        try {
+          const generatedDish = await aiService.generateDishFromName(dishName);
+          upsertDish({ ...generatedDish, addedFrom: 'ai' });
+          addedNames.push(dishName);
+        } catch {
+          // 其他动作仍会生效；生成失败会在下次对话中重新尝试。
+        }
+      }
+
+      loadDishes();
+      const appliedChanges = [
+        addedNames.length ? `已加入菜谱库：${addedNames.join('、')}` : '',
+        adjustedNames.length ? `已调整喜爱度：${adjustedNames.join('、')}` : '',
+        plan.preference.preferenceSummary ? '已更新长期口味偏好' : '',
+      ].filter(Boolean);
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `${plan.reply}${appliedChanges.length ? `\n\n✅ ${appliedChanges.join('；')}` : ''}`,
+      }]);
     } catch (error) {
       setChatMessages(prev => [
         ...prev,
@@ -770,12 +786,32 @@ export const RecipeLibrary: React.FC = () => {
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold mb-4">
-              {editingDish ? '编辑菜谱' : '添加新菜谱'}
-            </h3>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 px-4 py-4 sm:py-6">
+          <div className="mx-auto flex min-h-full w-full items-center justify-center">
+            <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl max-h-[min(92vh,56rem)]">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4 sm:px-6">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {editingDish ? '编辑菜谱' : '添加新菜谱'}
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {editingDish ? '修改后直接保存即可生效。' : '可以先输入菜名让 AI 补全，再按需要微调。'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditingDish(null);
+                  resetForm();
+                }}
+                className="rounded-full border border-gray-200 p-2 text-gray-500 transition-colors hover:bg-gray-100"
+                aria-label="关闭添加菜谱弹窗"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
             <div className="space-y-5">
               {!editingDish && (
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -787,19 +823,19 @@ export const RecipeLibrary: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">菜名 *</label>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <input
                     type="text"
                     value={newDish.name || ''}
                     onChange={(e) => setNewDish({ ...newDish, name: e.target.value })}
                     placeholder="例如：宫保鸡丁、番茄炒蛋"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                    className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-lg"
                   />
                   {!editingDish && (
                     <button
                       onClick={handleGenerateWithAI}
                       disabled={isGenerating || !newDish.name}
-                      className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg disabled:opacity-50 flex items-center gap-2"
+                      className="w-full justify-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg disabled:opacity-50 flex items-center gap-2 sm:w-auto sm:shrink-0"
                     >
                       {isGenerating ? (
                         <>
@@ -1101,28 +1137,20 @@ export const RecipeLibrary: React.FC = () => {
 
                   <div className="text-xs text-gray-500">
                     点左边标签名可给当前菜谱勾选/取消，点右侧垃圾桶会把这个标签从整个菜谱库中彻底移除。
+                  </div>
                 </div>
               </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setEditingDish(null);
-                    resetForm();
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-gray-700"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={!newDish.name}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl disabled:opacity-50"
-                >
-                  保存
-                </button>
               </div>
+
+            <div className="border-t border-gray-100 bg-white px-5 py-4 sm:px-6">
+              <button
+                onClick={handleSave}
+                disabled={!newDish.name}
+                className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl disabled:opacity-50"
+              >
+                保存
+              </button>
+            </div>
             </div>
           </div>
         </div>

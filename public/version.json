@@ -1,13 +1,11 @@
 {
-  "version": "1.1.0",
-  "title": "WeekEat v1.1.0",
-  "publishedAt": "2026-08-13",
-  "releaseUrl": "https://github.com/shiliuww/WeekEat/releases/tag/v1.1.0",
+  "version": "1.1.1",
+  "title": "WeekEat v1.1.1",
+  "publishedAt": "2026-09-15",
+  "releaseUrl": "https://github.com/shiliuww/WeekEat/releases/tag/v1.1.1",
   "releaseNotes": [
-    "新增 66 道更完整的家常基础菜谱，补充鸭肉、羊肉、湘味和蒸菜等常见选择。",
-    "新增历史记录勾选完成效果，可在历史菜谱和采购清单中标记已做或已买。",
-    "更新检查改为读取 GitHub Release，并在设置页支持手动检查更新。",
-    "新增本地数据备份与恢复功能，且备份文件不包含 API Key 或相关配置。"
+    "AI 对话现可读取本地菜谱库，并按明确指令新增菜谱、提炼长期饮食偏好和调整菜谱喜爱度。",
+    "菜谱库页与首页 AI 助手统一采用结构化动作协议，避免普通推荐被误写入本地库。"
   ],
   "forceUpdate": false
 }

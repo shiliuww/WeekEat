@@ -1,11 +1,56 @@
 import { AppConfig, loadConfig, PROVIDERS, supportsVision } from './config';
 import { Dish } from '../types';
 
+export type ConversationLibraryPlan = {
+  reply: string;
+  addDishNames: string[];
+  preference: {
+    likedIngredients: string[];
+    likedDishes: string[];
+    likedTags: string[];
+    dislikedIngredients: string[];
+    dislikedTags: string[];
+    healthGoals: string[];
+    preferenceSummary: string;
+    shouldRebalanceAllScores: boolean;
+  };
+  scoreAdjustments: { dishName: string; delta: number }[];
+};
+
 // ============================================
 // 细致的提示词系统
 // ============================================
 
 const PROMPTS = {
+  conversationLibraryPlan: (userMessage: string, dishes: Dish[]) => `你是 WeekEat 的本地菜谱库助手。你既要回答用户，也可以通过结构化动作修改当前设备上的菜谱库和偏好；动作会由应用在本地执行。
+
+用户说："${userMessage}"
+
+当前本地菜谱库（这是唯一可调整推荐度的菜谱集合）：
+${JSON.stringify(dishes.map(dish => ({ name: dish.name, ingredients: dish.ingredients.map(item => item.name), tags: dish.tags, recommendationScore: dish.recommendationScore })))}
+
+请只返回一个纯 JSON 对象，不要 Markdown 或解释，格式必须为：
+{
+  "reply": "给用户的简洁中文回复，需明确说明已执行的新增/偏好/喜爱度动作",
+  "addDishNames": ["仅当用户明确要求加入、收藏或建立新菜谱时填写菜名；已有同名菜不要填写"],
+  "preference": {
+    "likedIngredients": ["从用户明确表达的长期喜欢中提取"],
+    "likedDishes": ["从用户明确表达的长期喜欢中提取"],
+    "likedTags": ["清爽"],
+    "dislikedIngredients": ["从用户明确表达的不喜欢/忌口中提取"],
+    "dislikedTags": ["重口"],
+    "healthGoals": ["减脂"],
+    "preferenceSummary": "一句话偏好总结；没有长期偏好时为空字符串",
+    "shouldRebalanceAllScores": false
+  },
+  "scoreAdjustments": [{"dishName": "必须与当前库中的菜名完全一致", "delta": 15}]
+}
+
+规则：
+1. 用户明确说“加/加入/保存/收录一道菜”时，才在 addDishNames 返回菜名；不要把普通推荐自动加库。
+2. 只有用户明确喜欢、收藏、提高喜爱度或明确不喜欢、降低喜爱度时，才返回 scoreAdjustments。delta 为 -50 到 50 的整数，正数提高，负数降低。
+3. 不要为不存在的菜返回 scoreAdjustments；不要擅自删除或改写菜谱。
+4. 只有用户表达可长期沿用的口味、忌口或目标时才填写 preference，否则各数组为空、summary 为空、shouldRebalanceAllScores 为 false。`,
   // 菜名规范化
   normalizeDishName: (inputName: string) => {
     return `作为专业的美食专家，请将用户输入的菜名规范化为标准的、通用名称。
@@ -383,6 +428,42 @@ export class AIService {
       healthGoals: Array.isArray(parsed.healthGoals) ? parsed.healthGoals.filter(Boolean) : [],
       preferenceSummary: parsed.preferenceSummary || '',
       shouldRebalanceAllScores: Boolean(parsed.shouldRebalanceAllScores),
+    };
+  }
+
+  async planConversationLibraryChanges(userMessage: string, dishes: Dish[]): Promise<ConversationLibraryPlan> {
+    const response = await this.callAPI([
+      { role: 'user', content: PROMPTS.conversationLibraryPlan(userMessage, dishes) },
+    ]);
+    const parsed = this.extractJSON(response);
+    const preference = parsed.preference && typeof parsed.preference === 'object' ? parsed.preference : {};
+    const namesInLibrary = new Set(dishes.map(dish => dish.name));
+    const stringList = (value: unknown): string[] => Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map(item => item.trim())
+      : [];
+    const rawAdjustments: unknown[] = Array.isArray(parsed.scoreAdjustments) ? parsed.scoreAdjustments : [];
+
+    return {
+      reply: typeof parsed.reply === 'string' && parsed.reply.trim() ? parsed.reply.trim() : '已整理你的菜谱库需求。',
+      addDishNames: Array.from(new Set(stringList(parsed.addDishNames))).slice(0, 5),
+      preference: {
+        likedIngredients: stringList(preference.likedIngredients),
+        likedDishes: stringList(preference.likedDishes),
+        likedTags: stringList(preference.likedTags),
+        dislikedIngredients: stringList(preference.dislikedIngredients),
+        dislikedTags: stringList(preference.dislikedTags),
+        healthGoals: stringList(preference.healthGoals),
+        preferenceSummary: typeof preference.preferenceSummary === 'string' ? preference.preferenceSummary : '',
+        shouldRebalanceAllScores: Boolean(preference.shouldRebalanceAllScores),
+      },
+      scoreAdjustments: rawAdjustments
+            .filter((item: unknown): item is { dishName: string; delta: number } =>
+              Boolean(item) && typeof (item as { dishName?: unknown }).dishName === 'string' &&
+              typeof (item as { delta?: unknown }).delta === 'number' &&
+              namesInLibrary.has((item as { dishName: string }).dishName)
+            )
+            .map(item => ({ dishName: item.dishName, delta: Math.max(-50, Math.min(50, Math.round(item.delta))) }))
+            .filter((item: { dishName: string; delta: number }) => item.delta !== 0),
     };
   }
 

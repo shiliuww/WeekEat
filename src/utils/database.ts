@@ -377,3 +377,31 @@ export const boostRecommendationScore = (dishIds: string[], boostAmount: number 
   
   saveDishes(updatedDishes);
 };
+
+// 对话动作按菜名调整喜爱度；只处理当前本地库中已有的菜。
+export const adjustRecommendationScoresByName = (
+  adjustments: { dishName: string; delta: number }[]
+): string[] => {
+  const requested = new Map<string, number>();
+  adjustments.forEach(({ dishName, delta }) => {
+    if (!dishName?.trim() || !Number.isFinite(delta) || delta === 0) return;
+    requested.set(dishName.trim(), (requested.get(dishName.trim()) || 0) + delta);
+  });
+
+  const appliedNames: string[] = [];
+  const updatedDishes = getDishes().map(dish => {
+    const delta = requested.get(dish.name);
+    if (!delta) return dish;
+
+    appliedNames.push(dish.name);
+    return {
+      ...dish,
+      recommendationScore: delta > 0
+        ? liftScore(dish.recommendationScore ?? 50, delta)
+        : pullScoreDown(dish.recommendationScore ?? 50, Math.abs(delta)),
+    };
+  });
+
+  if (appliedNames.length > 0) saveDishes(updatedDishes);
+  return appliedNames;
+};
